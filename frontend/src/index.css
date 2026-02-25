@@ -604,6 +604,16 @@ textarea:focus-visible {
   align-items: start;
 }
 
+.inst-hero-grid-home {
+  grid-template-columns: 1fr;
+}
+
+.inst-hero-copy-home {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  text-align: center;
+}
+
 .inst-hero-copy h1 {
   margin: 12px 0 10px;
   font-size: clamp(2rem, 3.2vw, 3.2rem);
@@ -611,11 +621,27 @@ textarea:focus-visible {
   letter-spacing: -0.02em;
 }
 
+.inst-hero-copy-home h1 {
+  margin-top: 14px;
+  font-size: clamp(2.4rem, 4.6vw, 4.3rem);
+  line-height: 1.02;
+  max-width: 980px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .inst-hero-copy p {
   margin: 0;
   color: var(--muted);
   line-height: 1.65;
   max-width: 820px;
+}
+
+.inst-hero-copy-home p {
+  max-width: 920px;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 1.04rem;
 }
 
 .inst-pill {
@@ -649,6 +675,11 @@ textarea:focus-visible {
   margin-top: 16px;
 }
 
+.inst-hero-copy-home .inst-cta-row {
+  justify-content: center;
+  margin-top: 20px;
+}
+
 .inst-stats {
   margin-top: 16px;
   display: grid;
@@ -660,9 +691,21 @@ textarea:focus-visible {
   padding: 14px;
 }
 
+.inst-hero-copy-home .inst-stats {
+  width: min(980px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 18px;
+  padding: 16px;
+}
+
 .inst-stats > div {
   display: grid;
   gap: 2px;
+}
+
+.inst-hero-copy-home .inst-stats > div {
+  text-align: center;
 }
 
 .inst-stats strong {
@@ -670,9 +713,17 @@ textarea:focus-visible {
   font-size: 1rem;
 }
 
+.inst-hero-copy-home .inst-stats strong {
+  font-size: 1.22rem;
+}
+
 .inst-stats span {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.inst-hero-copy-home .inst-stats span {
+  font-size: 0.9rem;
 }
 
 .inst-hero-visual {

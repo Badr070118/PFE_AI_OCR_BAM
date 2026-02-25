@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import "./app-shell.css";
 import OcrPage from "./pages/OcrPage";
 import MlpdrPage from "./pages/MlpdrPage";
@@ -50,60 +50,34 @@ function InstitutionMark() {
   return (
     <div className="inst-brand">
       <div className="inst-brand-mark" aria-hidden>
-        <svg viewBox="0 0 64 64" className="inst-brand-mark-svg">
-          <path
-            d="M14 40c6-1 10-5 12-10 2-5 6-8 12-9 7-1 11 2 12 6 1 4-2 8-6 10-5 2-10 0-14 2-5 2-8 7-16 7z"
-            fill="currentColor"
-            opacity=".95"
-          />
-          <path d="M22 17c2 5 8 8 14 9" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" />
-          <path d="M28 28c6-2 11 1 12 6" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" opacity=".8" />
-        </svg>
+        <img src="/bam-logo.png" alt="" className="inst-brand-mark-img" loading="eager" decoding="async" />
       </div>
-      <div>
-        <p className="inst-brand-eyebrow">Portail Institutionnel</p>
-        <p className="inst-brand-title">Institution du Maroc</p>
+      <div className="inst-brand-copy">
+        <p className="inst-brand-title">Bank Al-Maghrib</p>
         <p className="inst-brand-subtitle">OCR Documents & MLPDR Plaques</p>
       </div>
     </div>
   );
 }
 
-function FacadeBanner() {
+function FacadeBanner({ scrollProgress }) {
   return (
-    <div className="inst-facade" aria-hidden>
+    <div className="inst-facade" aria-hidden style={{ "--facade-scroll": scrollProgress }}>
+      <img
+        src="/bam-facade-photo.jpg"
+        alt=""
+        className="inst-facade-photo"
+        loading="eager"
+        decoding="async"
+        onError={(event) => {
+          const img = event.currentTarget;
+          if (img.dataset.fallbackApplied === "1") return;
+          img.dataset.fallbackApplied = "1";
+          img.src = "/bam-facade.svg";
+        }}
+      />
       <div className="inst-facade-overlay" />
-      <svg viewBox="0 0 1200 240" className="inst-facade-svg">
-        <defs>
-          <linearGradient id="roof-grad" x1="0" x2="1">
-            <stop offset="0%" stopColor="#7d5b38" />
-            <stop offset="55%" stopColor="#a87e4f" />
-            <stop offset="100%" stopColor="#7a5334" />
-          </linearGradient>
-        </defs>
-        <rect x="0" y="138" width="1200" height="102" fill="#e6e0d6" />
-        <path d="M240 56 L620 28 L1015 55 L995 86 L258 84 Z" fill="url(#roof-grad)" />
-        <path d="M270 84 h700 v94 h-700z" fill="#d8c5a1" />
-        <path d="M295 84 h310 v94 h-310z" fill="#b59162" opacity=".85" />
-        <path d="M620 84 h145 v94 h-145z" fill="#efe9de" />
-        <g fill="#87643f">
-          <rect x="340" y="100" width="20" height="78" />
-          <rect x="390" y="100" width="20" height="78" />
-          <rect x="440" y="100" width="20" height="78" />
-          <rect x="490" y="100" width="20" height="78" />
-          <rect x="540" y="100" width="20" height="78" />
-          <rect x="670" y="103" width="18" height="75" />
-          <rect x="705" y="103" width="18" height="75" />
-        </g>
-        <g fill="none" stroke="#6a4a2c" strokeWidth="3" opacity=".75">
-          <path d="M300 94 q18 8 36 0 q18-8 36 0 q18 8 36 0 q18-8 36 0 q18 8 36 0" />
-          <path d="M300 114 q18 8 36 0 q18-8 36 0 q18 8 36 0 q18-8 36 0 q18 8 36 0" />
-          <path d="M300 134 q18 8 36 0 q18-8 36 0 q18 8 36 0 q18-8 36 0 q18 8 36 0" />
-        </g>
-        <path d="M648 178 q44-92 88 0" fill="#d5c3a2" stroke="#8d6a44" strokeWidth="4" />
-        <rect x="662" y="118" width="60" height="60" fill="#f3eee4" stroke="#8d6a44" strokeWidth="3" />
-      </svg>
-      <div className="inst-facade-label">Visuel institutionnel (inspiration)</div>
+      <div className="inst-facade-label">Siege Bank Al-Maghrib</div>
     </div>
   );
 }
@@ -138,15 +112,6 @@ function ShellNav({ pathname }) {
           </button>
         ))}
       </nav>
-
-      <div className="inst-navbar-tools">
-        <button type="button" className="inst-mini-btn" onClick={() => navigate("/ocr")}>
-          Test OCR
-        </button>
-        <button type="button" className="inst-mini-btn" onClick={() => navigate("/mlpdr")}>
-          Test MLPDR
-        </button>
-      </div>
     </div>
   );
 }
@@ -170,23 +135,22 @@ function HomeLanding() {
   return (
     <div className="inst-page">
       <section className="inst-hero-panel">
-        <div className="inst-hero-grid">
-          <div className="inst-hero-copy">
-            <span className="inst-pill inst-pill-primary">Portail Institutionnel</span>
+        <div className="inst-hero-grid inst-hero-grid-home">
+          <div className="inst-hero-copy inst-hero-copy-home">
             <h1>Portail unifie pour OCR documents et lecture de plaques MLPDR.</h1>
             <p>
-              Interface institutionnelle reelle de la plateforme. Accede aux modules OCR et MLPDR depuis une navigation
-              unique, avec le meme theme visuel sur toutes les pages.
+              Portail institutionnel unifie pour l'exploitation des modules OCR Documents et MLPDR Plaques, avec une
+              navigation centralisee et une experience coherente sur l'ensemble des pages.
             </p>
             <div className="inst-cta-row">
               <button type="button" className="btn primary" onClick={() => navigate("/project")}>
                 Voir la page projet
               </button>
               <button type="button" className="btn secondary" onClick={() => navigate("/ocr")}>
-                Tester OCR Documents
+                Acceder a OCR Documents
               </button>
               <button type="button" className="btn ghost" onClick={() => navigate("/mlpdr")}>
-                Tester MLPDR Plaques
+                Acceder a MLPDR Plaques
               </button>
             </div>
             <div className="inst-stats">
@@ -199,55 +163,30 @@ function HomeLanding() {
                 <span>Theme institutionnel unifie</span>
               </div>
               <div>
-                <strong>APIs reelles</strong>
+                <strong>APIs operationnelles</strong>
                 <span>/api/ocr et /api/mlpdr</span>
               </div>
             </div>
           </div>
 
-          <div className="inst-hero-visual">
-            <div className="inst-visual-card">
-              <div className="inst-visual-head">
-                <span className="inst-pill inst-pill-accent">Acces rapide</span>
-                <span className="inst-visual-dot">Prototype UI</span>
-              </div>
-              <div className="inst-visual-panels">
-                <div className="inst-visual-block">
-                  <p>Modules actifs</p>
-                  <ul>
-                    <li>OCR Documents (upload + structuration + chat)</li>
-                    <li>MLPDR Plaques (upload + detection + artefacts)</li>
-                  </ul>
-                </div>
-                <div className="inst-visual-block soft">
-                  <p>Navigation</p>
-                  <div className="inst-visual-grid">
-                    {Array.from({ length: 6 }).map((_, idx) => (
-                      <span key={idx} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
       <section className="inst-section">
         <div className="inst-section-head">
           <div>
-            <span className="inst-pill inst-pill-accent">Quick Access</span>
+            <span className="inst-pill inst-pill-accent">Acces Modules</span>
             <h2>Acces rapide</h2>
-            <p>Tuiles directes vers les pages reelles de test et de presentation du projet.</p>
+            <p>Acces directs aux modules metier, aux points de supervision et aux ressources principales du projet.</p>
           </div>
         </div>
         <div className="inst-quick-grid">
           <QuickAccessTile title="OCR Documents" description="Upload, JSON, Llama, chat document." onClick={() => navigate("/ocr")} />
           <QuickAccessTile title="MLPDR Plaques" description="Detection plaque et artefacts images." onClick={() => navigate("/mlpdr")} />
-          <QuickAccessTile title="Page Projet" description="Overview, workflow et acces modules." onClick={() => navigate("/project")} />
-          <QuickAccessTile title="Health OCR" description="Verifier le backend OCR via /health/ocr." onClick={() => window.open("/health/ocr", "_blank")} />
-          <QuickAccessTile title="Health MLPDR" description="Verifier le backend plaques via /health/mlpdr." onClick={() => window.open("/health/mlpdr", "_blank")} />
-          <QuickAccessTile title="API OCR Docs" description="Liste des documents OCR en base." onClick={() => window.open("/api/ocr/documents", "_blank")} />
+          <QuickAccessTile title="Page Projet" description="Architecture, workflow et acces modules." onClick={() => navigate("/project")} />
+          <QuickAccessTile title="Sante OCR" description="Etat de service OCR via /health/ocr." onClick={() => window.open("/health/ocr", "_blank")} />
+          <QuickAccessTile title="Sante MLPDR" description="Etat de service plaques via /health/mlpdr." onClick={() => window.open("/health/mlpdr", "_blank")} />
+          <QuickAccessTile title="Documents OCR" description="Consultation de la liste des documents OCR en base." onClick={() => window.open("/api/ocr/documents", "_blank")} />
         </div>
       </section>
     </div>
@@ -269,8 +208,8 @@ function ProjectLanding() {
               <span className="inst-pill inst-pill-accent">Page Projet</span>
               <h1>Plateforme OCR & Lecture de Plaques</h1>
               <p>
-                Portail unifie pour les tests metier OCR documents et MLPDR plaques, relie aux APIs reelles via la
-                passerelle nginx existante.
+                Portail institutionnel unifie pour les flux OCR Documents et MLPDR Plaques, connecte aux APIs metier
+                via la passerelle Nginx de la plateforme.
               </p>
               <div className="inst-cta-row">
                 <button type="button" className="btn primary" onClick={() => navigate("/ocr")}>
@@ -305,10 +244,10 @@ function ProjectLanding() {
               </div>
               <div className="inst-project-actions">
                 <button type="button" className="btn primary" onClick={() => navigate("/ocr")}>
-                  Tester OCR maintenant
+                  Ouvrir OCR Documents
                 </button>
                 <button type="button" className="btn secondary" onClick={() => navigate("/mlpdr")}>
-                  Tester MLPDR maintenant
+                  Ouvrir MLPDR Plaques
                 </button>
               </div>
             </div>
@@ -319,9 +258,9 @@ function ProjectLanding() {
       <section className="inst-section">
         <div className="inst-section-head">
           <div>
-            <span className="inst-pill inst-pill-primary">Modules reels</span>
-            <h2>Acces directs aux pages de test</h2>
-            <p>Les contenus metier restent identiques, seul le theme visuel est harmonise avec la page d'accueil.</p>
+            <span className="inst-pill inst-pill-primary">Modules metier</span>
+            <h2>Acces directs aux modules</h2>
+            <p>Acces aux fonctionnalites OCR Documents et MLPDR Plaques depuis un portail institutionnel unifie.</p>
           </div>
         </div>
         <div className="inst-project-modules">
@@ -393,6 +332,31 @@ function RouteView({ pathname }) {
 
 export default function App() {
   const pathname = usePathname();
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    let rafId = 0;
+
+    const updateScroll = () => {
+      rafId = 0;
+      setScrollY(window.scrollY || 0);
+    };
+
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(updateScroll);
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  const facadeScrollProgress = Math.min(scrollY / 220, 1);
 
   return (
     <div className="shell">
@@ -402,14 +366,14 @@ export default function App() {
             <InstitutionMark />
             <div className="shell-topbar-right">
               <div className="shell-topbar-meta">
-                <span>Portail public</span>
+                <span>Plateforme metier</span>
                 <span className="dot" />
-                <span>Navigation institutionnelle</span>
+                <span>Exploitation institutionnelle</span>
               </div>
               <LanguageSwitch />
             </div>
           </div>
-          <FacadeBanner />
+          <FacadeBanner scrollProgress={facadeScrollProgress} />
         </div>
         <div className="shell-nav-wrap">
           <ShellNav pathname={pathname} />
@@ -424,28 +388,47 @@ export default function App() {
         <div className="shell-footer-grid">
           <div>
             <div className="shell-footer-brand">
-              <span className="shell-footer-brand-icon">IM</span>
+              <span className="shell-footer-brand-icon">BAM</span>
               <div>
-                <strong>Institution du Maroc</strong>
-                <p>Portail OCR / MLPDR (frontend reel)</p>
+                <strong>Bank Al-Maghrib</strong>
+                <p>Portail OCR / MLPDR institutionnel</p>
               </div>
             </div>
             <p className="shell-footer-text">
-              Interface unifiee de demonstration et de test pour les modules OCR Documents et MLPDR Plaques, connectee
-              aux APIs reelles de la plateforme.
+              Interface unifiee d'exploitation pour les modules OCR Documents et MLPDR Plaques, connectee aux APIs
+              metier de la plateforme via la passerelle institutionnelle.
             </p>
+            <div className="shell-footer-social">
+              <p className="shell-footer-col-title">Nos reseaux sociaux / Application mobile</p>
+              <div className="shell-footer-social-row" aria-label="Reseaux sociaux et application mobile">
+                <a href="#" className="shell-footer-social-link" aria-label="X" onClick={(e) => e.preventDefault()}>X</a>
+                <a href="#" className="shell-footer-social-link" aria-label="LinkedIn" onClick={(e) => e.preventDefault()}>in</a>
+                <a href="#" className="shell-footer-social-link" aria-label="YouTube" onClick={(e) => e.preventDefault()}>YT</a>
+                <a href="#" className="shell-footer-social-link" aria-label="Facebook" onClick={(e) => e.preventDefault()}>f</a>
+                <a href="#" className="shell-footer-social-link" aria-label="Instagram" onClick={(e) => e.preventDefault()}>ig</a>
+                <a href="#" className="shell-footer-social-link" aria-label="Application mobile" onClick={(e) => e.preventDefault()}>app</a>
+              </div>
+            </div>
           </div>
 
-          <div className="shell-footer-links">
-            <button type="button" onClick={() => navigate("/")}>Accueil</button>
-            <button type="button" onClick={() => navigate("/project")}>Projet</button>
-            <button type="button" onClick={() => navigate("/ocr")}>OCR Documents</button>
-            <button type="button" onClick={() => navigate("/mlpdr")}>MLPDR Plaques</button>
+          <div className="shell-footer-contact">
+            <p className="shell-footer-col-title">Toujours a votre ecoute</p>
+            <ul className="shell-footer-list">
+              <li><a href="#" onClick={(e) => e.preventDefault()}>Localisez nous</a></li>
+              <li><a href="#" onClick={(e) => e.preventDefault()}>Nous contacter</a></li>
+              <li><a href="/health/ocr" target="_blank" rel="noreferrer">Etat du service OCR</a></li>
+              <li><a href="/health/mlpdr" target="_blank" rel="noreferrer">Etat du service MLPDR</a></li>
+            </ul>
           </div>
         </div>
         <div className="shell-footer-bottom">
-          <span>© 2026 Portail institutionnel OCR / MLPDR</span>
-          <span>FR / EN / ع</span>
+          <span>Copyright 2026 Bank Al-Maghrib</span>
+          <div className="shell-footer-legal-links">
+            <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }}>Plan de site</a>
+            <a href="#" onClick={(e) => e.preventDefault()}>Mentions legales</a>
+            <a href="#" onClick={(e) => e.preventDefault()}>Contactez nous</a>
+            <a href="/project" onClick={(e) => { e.preventDefault(); navigate("/project"); }}>Liens utiles</a>
+          </div>
         </div>
       </footer>
     </div>

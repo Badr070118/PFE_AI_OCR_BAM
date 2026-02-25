@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 260" role="img" aria-label="Façade stylisée Bank Al-Maghrib">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d8cdbb"/>
+      <stop offset="0.42" stop-color="#d8d0c6"/>
+      <stop offset="1" stop-color="#c9c7c6"/>
+    </linearGradient>
+    <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cda46e"/>
+      <stop offset="1" stop-color="#b88854"/>
+    </linearGradient>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f1e6d7"/>
+      <stop offset="1" stop-color="#efe7de"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7a695c"/>
+      <stop offset="1" stop-color="#6f6257"/>
+    </linearGradient>
+    <pattern id="mosaic" width="18" height="10" patternUnits="userSpaceOnUse">
+      <rect width="18" height="10" fill="#987045"/>
+      <path d="M0 5 C3 1 6 9 9 5 C12 1 15 9 18 5" fill="none" stroke="#7a5635" stroke-width="1.4" opacity=".85"/>
+      <path d="M0 1.3H18M0 8.7H18" stroke="#b68855" stroke-width=".6" opacity=".55"/>
+    </pattern>
+  </defs>
+
+  <rect width="1400" height="260" fill="url(#sky)"/>
+  <path d="M0 173 C175 165 310 176 470 170 C665 163 770 177 935 171 C1095 165 1230 174 1400 166 V260 H0 Z" fill="#d7cfbf" opacity=".85"/>
+
+  <!-- Rear modern wing -->
+  <g transform="translate(838 74)">
+    <path d="M0 0 H448 V22 H10 C7 25 4 28 0 31 Z" fill="#e7e0d5"/>
+    <rect x="0" y="20" width="458" height="94" fill="#f0ece5"/>
+    <rect x="0" y="112" width="458" height="12" fill="#d8c7ac"/>
+    <g fill="#6f5b49" opacity=".82">
+      <rect x="52" y="44" width="8" height="60"/>
+      <rect x="82" y="44" width="8" height="60"/>
+      <rect x="112" y="44" width="8" height="60"/>
+      <rect x="142" y="44" width="8" height="60"/>
+      <rect x="172" y="44" width="8" height="60"/>
+      <rect x="232" y="44" width="8" height="60"/>
+      <rect x="262" y="44" width="8" height="60"/>
+      <rect x="292" y="44" width="8" height="60"/>
+      <rect x="322" y="44" width="8" height="60"/>
+      <rect x="352" y="44" width="8" height="60"/>
+      <rect x="382" y="44" width="8" height="60"/>
+    </g>
+  </g>
+
+  <!-- Main corner block -->
+  <g transform="translate(285 66)">
+    <path d="M0 0 L435 0 L413 18 L22 18 Z" fill="#b48a58"/>
+    <rect x="6" y="18" width="404" height="26" fill="url(#mosaic)"/>
+    <rect x="0" y="44" width="238" height="130" rx="3" fill="url(#stone)"/>
+    <rect x="238" y="44" width="188" height="130" fill="url(#wall)"/>
+
+    <!-- Decorative frame -->
+    <rect x="40" y="55" width="156" height="92" fill="#c99762" stroke="#8b633d" stroke-width="2"/>
+    <rect x="48" y="63" width="140" height="76" fill="none" stroke="#a77749" stroke-width="2" opacity=".8"/>
+    <g fill="none" stroke="#94683f" stroke-width="1.3" opacity=".75">
+      <path d="M49 72 C65 66 74 78 89 72 C104 66 112 78 127 72 C142 66 151 78 166 72 C177 68 181 70 188 72"/>
+      <path d="M49 82 C65 76 74 88 89 82 C104 76 112 88 127 82 C142 76 151 88 166 82 C177 78 181 80 188 82"/>
+    </g>
+
+    <!-- Windows -->
+    <g>
+      <rect x="72" y="84" width="26" height="38" rx="11" fill="#253246"/>
+      <rect x="132" y="84" width="26" height="38" rx="11" fill="#253246"/>
+      <rect x="252" y="78" width="24" height="42" rx="10" fill="#273449"/>
+      <rect x="294" y="78" width="24" height="42" rx="10" fill="#273449"/>
+      <rect x="336" y="78" width="24" height="42" rx="10" fill="#273449"/>
+      <rect x="72" y="90" width="26" height="20" fill="#aebecd" opacity=".65"/>
+      <rect x="132" y="90" width="26" height="20" fill="#aebecd" opacity=".65"/>
+      <rect x="252" y="84" width="24" height="18" fill="#aebecd" opacity=".6"/>
+      <rect x="294" y="84" width="24" height="18" fill="#aebecd" opacity=".6"/>
+      <rect x="336" y="84" width="24" height="18" fill="#aebecd" opacity=".6"/>
+    </g>
+
+    <!-- Arabic and French signage (stylized) -->
+    <path d="M34 32 C52 21 60 38 79 30 C96 24 105 39 120 31 C138 22 149 37 164 30 C178 24 192 34 205 28" fill="none" stroke="#5f442d" stroke-width="2.5" stroke-linecap="round"/>
+    <text x="66" y="48" font-size="7" fill="#3f2d20" font-family="Georgia, serif" opacity=".92">BANK AL-MAGHRIB</text>
+
+    <!-- Main entrance arch -->
+    <path d="M95 173 v-32 c0-22 14-35 28-35s28 13 28 35v32z" fill="#2a1d14"/>
+    <path d="M100 173 v-28 c0-18 11-29 23-29s23 11 23 29v28z" fill="#18110d"/>
+    <path d="M93 173h60" stroke="#7a5739" stroke-width="3"/>
+    <rect x="113" y="103" width="20" height="7" rx="3" fill="#c9a273" opacity=".7"/>
+
+    <!-- Colonnade / arcade -->
+    <rect x="0" y="174" width="426" height="8" fill="#c4ad90"/>
+    <g fill="#ece6dc">
+      <rect x="14" y="182" width="16" height="48"/>
+      <rect x="42" y="182" width="16" height="48"/>
+      <rect x="70" y="182" width="16" height="48"/>
+      <rect x="98" y="182" width="16" height="48"/>
+      <rect x="126" y="182" width="16" height="48"/>
+      <rect x="154" y="182" width="16" height="48"/>
+      <rect x="182" y="182" width="16" height="48"/>
+      <rect x="210" y="182" width="16" height="48"/>
+      <rect x="248" y="182" width="14" height="48"/>
+      <rect x="280" y="182" width="14" height="48"/>
+      <rect x="312" y="182" width="14" height="48"/>
+      <rect x="344" y="182" width="14" height="48"/>
+      <rect x="376" y="182" width="14" height="48"/>
+      <rect x="408" y="182" width="14" height="48"/>
+    </g>
+    <rect x="0" y="228" width="426" height="8" fill="#b8976d"/>
+  </g>
+
+  <!-- Flag -->
+  <g transform="translate(462 18)">
+    <rect x="0" y="14" width="4" height="84" fill="#47372d"/>
+    <path d="M4 18 C22 15 34 17 46 22 L46 48 C35 42 24 40 4 42 Z" fill="#a11421"/>
+    <path d="M25 29 l4 7 8 1-6 5 2 8-8-4-8 4 2-8-6-5 8-1z" fill="none" stroke="#0f6b3f" stroke-width="1.5" opacity=".85"/>
+  </g>
+
+  <!-- Side street / curb -->
+  <path d="M0 230 C210 214 350 228 520 222 C790 212 1010 226 1400 218 V260 H0 Z" fill="url(#road)" opacity=".88"/>
+  <path d="M0 232 C30 229 44 246 74 242 C98 238 112 251 132 247 C154 242 170 255 190 250 C214 244 229 254 245 249 V260 H0 Z" fill="#ba2b2b" opacity=".8"/>
+  <g opacity=".32">
+    <path d="M1160 22v168" stroke="#9f9387" stroke-width="2"/>
+    <path d="M1168 36v156" stroke="#9f9387" stroke-width="1.5"/>
+    <path d="M1176 54v140" stroke="#9f9387" stroke-width="1.2"/>
+    <path d="M1184 66v130" stroke="#9f9387" stroke-width="1"/>
+  </g>
+
+  <!-- Atmospheric haze -->
+  <rect width="1400" height="260" fill="#fff" opacity=".07"/>
+</svg>

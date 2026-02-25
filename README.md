@@ -1,187 +1,173 @@
-# PFE AI OCR - Monorepo (React + FastAPI OCR + FastAPI ANPR + Postgres + Nginx)
+# PFE AI OCR BAM - Monorepo OCR + MLPDR
 
-Architecture fusionnee production-ready qui conserve les projets existants et les integre dans un repo unique.
+Plateforme unifiee pour Bank Al-Maghrib regroupant :
+- un module OCR Documents (upload, extraction, structuration, review)
+- un module MLPDR (lecture de plaques / detection + OCR)
+- un frontend React unique
+- une passerelle Nginx
+- une base PostgreSQL partagee
+- un service Ollama (fallback LLM pour OCR)
 
-## Ce qui a ete fait
+Le projet est organise en monorepo Dockerise pour faciliter le developpement local et le deploiement.
 
-- `frontend/` : frontend React unique (routes `/ocr` et `/anpr`)
-- `services/ocr/` : wrapper FastAPI + code OCR existant preserve sous `app/legacy/`
-- `services/anpr/` : wrapper FastAPI + code ANPR existant preserve sous `src/`
-- `postgres` : base unique avec schemas `ocr_schema` et `anpr_schema`
-- `nginx` : reverse proxy unique (`/api/ocr/*`, `/api/anpr/*`, `/` static React)
-- `docker-compose.yml` : lancement de toute la stack en une commande
-- healthchecks, volumes, CORS sans wildcard
+## 1. Vue d'ensemble
 
-## Arborescence cible
+### Modules metier
+- `OCR Documents` : traitement de documents (images/PDF), extraction OCR, structuration, review et interactions LLM.
+- `MLPDR Plaques` : detection de plaques, OCR plaques et exposition des artefacts de traitement.
+
+### Points d'entree
+- `http://localhost/` : portail web unifie (React + branding BAM)
+- `http://localhost/ocr` : module OCR
+- `http://localhost/mlpdr` : module MLPDR
+- `http://localhost/anpr` : alias/redirection vers MLPDR (compatibilite)
+
+## 2. Architecture technique
+
+### Services Docker (compose principal)
+- `nginx` : reverse proxy + serveur statique du build frontend Vite
+- `service-ocr` : API FastAPI wrapper + code legacy OCR monte sous `/api/ocr`
+- `service-mlpdr` : API FastAPI wrapper + code legacy MLPDR monte sous `/api/mlpdr`
+- `postgres` : base de donnees commune (schemas separes)
+- `ollama` : runtime LLM local (fallback)
+- `ollama-init` : pull automatique du modele Ollama configure
+
+### Routing (via Nginx)
+- `GET /` -> frontend React (fichiers statiques)
+- `GET|POST /api/ocr/*` -> `service-ocr`
+- `GET|POST /api/mlpdr/*` -> `service-mlpdr`
+- `GET|POST /api/anpr/*` -> alias/rewrite vers `/api/mlpdr/*`
+- `GET /health/ocr` -> `service-ocr /api/ocr/health`
+- `GET /health/mlpdr` -> `service-mlpdr /api/mlpdr/health`
+- `GET /health/anpr` -> redirection vers `/health/mlpdr`
+
+## 3. Technologies utilisees
+
+### Frontend (`frontend/`)
+- React 18
+- Vite 5
+- Axios
+- CSS custom (branding / portail BAM)
+
+### Backend OCR (`services/ocr/`)
+- FastAPI
+- Uvicorn
+- SQLAlchemy
+- Psycopg (PostgreSQL)
+- Pydantic / pydantic-settings
+- Pillow
+- PyMuPDF (`pymupdf`)
+- OpenCV (`opencv-python-headless`)
+- NumPy
+- Tesseract (`pytesseract` + binaire systeme)
+- RapidOCR ONNX Runtime (`rapidocr-onnxruntime`)
+- Requests (integrations externes / LLM)
+
+### Backend MLPDR (`services/anpr/` -> service `service-mlpdr`)
+- FastAPI
+- Uvicorn
+- OpenCV
+- NumPy
+- Pillow
+- Tesseract (`pytesseract`)
+- `arabic-reshaper`, `python-bidi` (rendu texte arabe)
+- SQLAlchemy / Psycopg / Pydantic
+- Poids YOLO (detection + OCR) via volumes Docker
+
+### Infra / Data / Runtime
+- Docker / Docker Compose
+- Nginx
+- PostgreSQL 16 (Alpine)
+- Ollama (LLM local, fallback)
+
+## 4. Structure du repository
 
 ```text
-/
-  docker-compose.yml
-  .env.example
-  .env
-  README.md
-  nginx/
-    Dockerfile
-    nginx.conf
-  db/
-    init/
-      001_init_schemas.sql
-  services/
-    ocr/
-      Dockerfile
-      requirements.txt
-      app/
-        main.py
-        api/
-        core/
-        db/
-        services/
-        schemas/
-        legacy/   <- code OCR existant adapte (imports only)
-    anpr/
-      Dockerfile
-      requirements.txt
-      src/       <- code ANPR existant adapte (routing/config only)
-      app/
-        main.py
-        api/
-        core/
-        db/
-        services/
-        schemas/
-  frontend/
-    Dockerfile
-    .env.development
-    .env.production
-    src/
+.
+|- README.md
+|- docker-compose.yml
+|- docker-compose.dev.yml
+|- .env.example
+|- db/
+|  `- init/
+|     `- 001_init_schemas.sql
+|- nginx/
+|  |- Dockerfile
+|  `- nginx.conf
+|- frontend/
+|  |- public/                 # assets branding BAM utilises par le frontend
+|  |- src/
+|  |- package.json
+|  `- Dockerfile
+|- services/
+|  |- ocr/
+|  |  |- app/
+|  |  |  |- api/
+|  |  |  |- core/
+|  |  |  |- db/
+|  |  |  |- services/
+|  |  |  `- legacy/
+|  |  |- requirements.txt
+|  |  `- Dockerfile
+|  `- anpr/                  # code MLPDR (nom historique du dossier)
+|     |- app/
+|     |- src/
+|     |- requirements.txt
+|     `- Dockerfile
+|- Projet_OCR_BAM/           # assets/modeles OCR legacy (volumes)
+|- MLPDR-main/               # poids/modeles MLPDR legacy (volumes)
+`- assets/                   # ressources source (logo/photo BAM)
 ```
 
-## Demarrage (Docker)
+## 5. Prerequis
 
-Le fichier `docker-compose.yml` est le mode PROD/stable (sans bind mounts de code, images propres).
+- Docker Desktop (ou Docker Engine + Compose v2)
+- Ports disponibles : `80`, `5432`, `8001`, `8002` (selon config)
+- Fichier `.env` present (copie de `.env.example` si besoin)
 
-1. Verifier le fichier `.env` (deja cree depuis `.env.example`).
-2. Premier build / PROD :
+## 6. Demarrage rapide (Docker)
 
+### Premiere execution
 ```bash
 docker compose up --build
 ```
 
-3. Builds suivants (plus rapides) :
-
+### Executions suivantes
 ```bash
 docker compose up
 ```
 
-4. Ouvrir :
-- `http://localhost/` (frontend React unique)
+### En arriere-plan
+```bash
+docker compose up -d
+```
+
+### Acces application
+- `http://localhost/`
 - `http://localhost/ocr`
-- `http://localhost/anpr`
+- `http://localhost/mlpdr`
 
-## Mode DEV rapide (hot reload backend)
+## 7. Mode developpement (hot reload backend)
 
-Overlay Compose : `docker-compose.dev.yml`
+Le fichier `docker-compose.dev.yml` sert d'overlay de dev pour monter le code backend et lancer Uvicorn en `--reload`.
 
-Commande DEV recommandee (premier lancement) :
-
+### Lancement dev recommande
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-Puis pour les changements de code backend (sans rebuild) :
-
+### Relance sans rebuild
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-Ce que fait l'overlay DEV :
-- monte `services/ocr/app` en volume dans `service-ocr`
-- monte `services/anpr/app` et `services/anpr/src` en volume dans `service-anpr`
-- lance `uvicorn --reload` sur les deux services FastAPI
-- conserve `postgres` + `nginx` identiques au compose de base
+### Ce que fait l'overlay
+- bind mount `services/ocr/app` dans `service-ocr`
+- bind mount `services/anpr/app` et `services/anpr/src` dans `service-mlpdr`
+- `uvicorn --reload` sur les deux APIs
+- `postgres`, `nginx`, `ollama` conserves via le compose principal
 
-## Optimisation des builds Docker (cache)
-
-Les Dockerfiles ont ete ajustes pour accelerer les rebuilds :
-- `requirements.txt` est copie avant le code Python (cache de layer)
-- `pip install` utilise `RUN --mount=type=cache,target=/root/.cache/pip ...`
-- suppression de `--no-cache-dir` (sinon pip ne peut rien reutiliser)
-- frontend/Nginx : `package*.json` copie avant le source + `npm ci` avec cache BuildKit
-
-Impact attendu :
-- changement dans `app/` ou `src/` -> `pip install` ne se relance pas
-- changement front JS/TS -> `npm ci` ne se relance pas si `package-lock.json` ne change pas
-
-Note BuildKit :
-- Docker Compose v2 l'utilise generalement par defaut
-- si besoin (ancien setup), activer `DOCKER_BUILDKIT=1`
-
-## Routing final (via Nginx)
-
-- `GET /` -> React (build Vite servi statiquement par Nginx)
-- `GET|POST /api/ocr/*` -> `service-ocr`
-- `GET|POST /api/anpr/*` -> `service-anpr`
-- `GET /health/ocr` -> proxy vers `service-ocr /api/ocr/health`
-- `GET /health/anpr` -> proxy vers `service-anpr /api/anpr/health`
-
-## Endpoints de sante
-
-### OCR
-- `GET http://localhost:8001/health`
-- `GET http://localhost:8001/api/ocr/health`
-- `GET http://localhost/health/ocr` (via nginx)
-
-### ANPR
-- `GET http://localhost:8002/health`
-- `GET http://localhost:8002/api/anpr/health`
-- `GET http://localhost/health/anpr` (via nginx)
-
-## Endpoints metier (principaux)
-
-### OCR (via nginx)
-- `POST /api/ocr/upload`
-- `POST /api/ocr/ocr`
-- `POST /api/ocr/ocr/invoice-table`
-- `GET /api/ocr/documents`
-- `POST /api/ocr/documents/{id}/ask`
-- `POST /api/ocr/process_with_llama`
-- `PUT /api/ocr/documents/{id}/data`
-- `GET|POST|PUT /api/ocr/review/*`
-
-### ANPR (via nginx)
-- `POST /api/anpr/read-plate`
-- `POST /api/anpr/detect` (alias)
-- `POST /api/anpr/recognize` (alias)
-
-## Variables d'environnement (centrales)
-
-Fichier : `.env`
-
-Variables importantes :
-- `DATABASE_URL` : URL Postgres partagee
-- `OCR_DB_SCHEMA` / `ANPR_DB_SCHEMA` : schemas applicatifs
-- `CORS_ALLOW_ORIGINS` : liste CSV (pas de wildcard)
-- `OCR_UPLOAD_DIR`, `OCR_RESULTS_DIR`
-- `ANPR_MODEL_PATH`, `ANPR_FALLBACK_MODEL_PATH`
-
-## Base de donnees
-
-Initialisation automatique au demarrage Postgres via `db/init/001_init_schemas.sql` :
-
-```sql
-CREATE SCHEMA IF NOT EXISTS ocr_schema;
-CREATE SCHEMA IF NOT EXISTS anpr_schema;
-```
-
-En plus, les services re-appliquent le `search_path` sur chaque connexion SQLAlchemy (`SET search_path TO <schema>, public`).
-
-## CORS (prod / dev)
-
-- Pas de wildcard
-- Production : origine Nginx (`http://localhost` en local Docker)
-- Dev : `localhost:5173` autorise (frontend Vite)
-
-## Frontend (dev local)
+## 8. Frontend en local (hors Docker)
 
 ```bash
 cd frontend
@@ -189,81 +175,164 @@ npm ci
 npm run dev
 ```
 
-Routes frontend :
-- `/ocr` : UI OCR (frontend existant conserve)
-- `/anpr` : UI ANPR (integree dans le site unique)
+Le frontend Vite appelle les APIs via `/api/ocr/*` et `/api/mlpdr/*` (ou `/api/anpr/*` alias cote Nginx).
 
-Le frontend appelle :
-- `/api/ocr/...`
-- `/api/anpr/...`
+## 9. Workflow de rebuild (pratique)
 
-## Volumes & donnees
+### Apres changement frontend (UI / CSS / React)
+```bash
+docker compose up -d --build nginx
+```
 
-- `postgres_data` : donnees Postgres
+### Apres changement backend OCR
+```bash
+docker compose up -d --build service-ocr
+```
+
+### Apres changement backend MLPDR
+```bash
+docker compose up -d --build service-mlpdr
+```
+
+### Rebuild complet (si besoin)
+```bash
+docker compose up -d --build
+```
+
+## 10. Endpoints principaux
+
+### Sante
+#### OCR
+- `GET http://localhost:8001/health`
+- `GET http://localhost:8001/api/ocr/health`
+- `GET http://localhost/health/ocr`
+
+#### MLPDR
+- `GET http://localhost:8002/health`
+- `GET http://localhost:8002/api/mlpdr/health`
+- `GET http://localhost/health/mlpdr`
+- `GET http://localhost/health/anpr` (alias)
+
+### OCR (via Nginx)
+- `POST /api/ocr/upload`
+- `POST /api/ocr/ocr`
+- `POST /api/ocr/ocr/invoice-table`
+- `GET /api/ocr/documents`
+- `POST /api/ocr/documents/{id}/ask`
+- `POST /api/ocr/generate_with_llama`
+- `POST /api/ocr/process_with_llama`
+- `PUT /api/ocr/documents/{id}/data`
+- `GET|POST|PUT /api/ocr/review/*`
+
+### MLPDR (via Nginx)
+- `POST /api/mlpdr/upload`
+- `GET /api/mlpdr/artifacts/{filename}`
+- `GET /api/mlpdr/received/{filename}`
+- `GET /api/anpr/*` (alias Nginx vers `/api/mlpdr/*`)
+
+## 11. Variables d'environnement importantes (`.env`)
+
+### Application / CORS
+- `APP_ENV`
+- `PUBLIC_APP_URL`
+- `CORS_ALLOW_ORIGINS`
+
+### PostgreSQL
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_PORT`
+- `DATABASE_URL`
+
+### Schemas DB
+- `OCR_DB_SCHEMA` (defaut : `ocr_schema`)
+- `MLPDR_DB_SCHEMA` (defaut : `mlpdr_schema`)
+
+### OCR service
+- `OCR_SERVICE_PORT`
+- `OCR_UPLOAD_DIR`
+- `OCR_RESULTS_DIR`
+- `LLAMA_CPP_URL`, `LLAMA_CPP_MODEL`
+- `LLM_FALLBACK_OLLAMA`
+- `OLLAMA_BASE_URL`, `OLLAMA_MODEL`
+
+### MLPDR service
+- `MLPDR_SERVICE_PORT`
+- `MLPDR_DETECTION_WEIGHTS_PATH`
+- `MLPDR_DETECTION_CFG_PATH`
+- `MLPDR_OCR_WEIGHTS_PATH`
+- `MLPDR_OCR_CFG_PATH`
+
+## 12. Base de donnees
+
+### Initialisation des schemas
+Le fichier `db/init/001_init_schemas.sql` cree automatiquement :
+- `ocr_schema`
+- `mlpdr_schema`
+
+### Isolation par schema
+Chaque service reapplique le `search_path` SQLAlchemy sur son schema applicatif (`ocr_schema` / `mlpdr_schema`).
+
+## 13. Volumes et assets
+
+### Volumes Docker
+- `postgres_data` : donnees PostgreSQL
+- `ollama_data` : modeles Ollama
 - `ocr_uploads` : uploads OCR
-- `ocr_results` : sorties OCR
-- `anpr_outputs` : sorties ANPR
+- `ocr_results` : resultats OCR
+- `mlpdr_outputs` : sorties MLPDR
 - `nginx_logs` : logs Nginx
 
-### Modeles / datasets utilises (bind mounts actuels)
+### Assets / modeles montes en bind (etat actuel)
+- OCR : `./Projet_OCR_BAM/models` -> `/srv/service/models`
+- MLPDR : `./MLPDR-main/MLPDR-main/weights` -> `/srv/service/weights`
 
-Pour ne pas casser l'existant, `docker-compose.yml` monte directement les assets depuis tes dossiers sources :
-- `./Projet_OCR_BAM/models` -> OCR
-- `./alpr-immatriculation-main/alpr-immatriculation-main/models` -> ANPR
-- `./alpr-immatriculation-main/alpr-immatriculation-main/data` -> ANPR
-- `./alpr-immatriculation-main/alpr-immatriculation-main/runs` -> ANPR
+### Branding BAM (frontend)
+- `assets/` : ressources source (photo/logo)
+- `frontend/public/bam-logo.png`
+- `frontend/public/bam-facade-photo.jpg`
+- `frontend/public/bam-facade.svg` (fallback)
 
-## Instructions claires de deplacement (optionnel, pour clean-up final)
+## 14. Debug / verification
 
-Si tu veux finaliser la migration et ne plus dependre des anciens dossiers a la racine, fais ces moves puis mets a jour les volumes dans `docker-compose.yml` :
-
-1. `move .\Projet_OCR_BAM\models .\models\ocr`
-2. `move .\alpr-immatriculation-main\alpr-immatriculation-main\models .\models\anpr\models`
-3. `move .\alpr-immatriculation-main\alpr-immatriculation-main\data .\models\anpr\data`
-4. `move .\alpr-immatriculation-main\alpr-immatriculation-main\runs .\models\anpr\runs`
-
-Le code source a deja ete repris dans la nouvelle arborescence :
-- OCR : `Projet_OCR_BAM/app` -> `services/ocr/app/legacy`
-- ANPR : `alpr-immatriculation-main/alpr-immatriculation-main/src` -> `services/anpr/src`
-- Frontend : base OCR dans `frontend/` + UI ANPR integree sous `/anpr`
-
-## Debug tips
-
-- Verifier la config compose resolue :
+### Verifier la config compose
 ```bash
 docker compose config
 ```
 
-- Voir les logs d'un service :
+### Logs de services
 ```bash
-docker compose logs -f service-ocr
-docker compose logs -f service-anpr
 docker compose logs -f nginx
+docker compose logs -f service-ocr
+docker compose logs -f service-mlpdr
+docker compose logs -f postgres
 ```
 
-- Verifier la config DEV fusionnee :
+### Healthchecks
+```bash
+curl http://localhost/health/ocr
+curl http://localhost/health/mlpdr
+```
+
+### Verifier la configuration dev fusionnee
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml config
 ```
 
-- Tester les healthchecks via nginx :
-```bash
-curl http://localhost/health/ocr
-curl http://localhost/health/anpr
-```
+## 15. Notes utiles
 
-- Si ANPR echoue au demarrage : verifier la presence des poids YOLO dans les bind mounts (`models/yolo/...` ou `runs/detect/...`).
+- Le dossier `services/anpr/` contient le code du module MLPDR (nom de dossier historique, service expose en `service-mlpdr`).
+- Le frontend affiche un portail BAM unifie, avec navigation OCR / MLPDR et branding local (`assets` -> `frontend/public`).
+- L'alias `/api/anpr/*` est conserve pour compatibilite, mais le prefixe principal actuel est `/api/mlpdr/*`.
 
-- Si OCR review ne retrouve pas les fichiers uploades : verifier le volume `ocr_uploads` et les variables `OCR_UPLOAD_DIR` / `UPLOADS_DIR`.
+## 16. Validation locale (reference)
 
-- Si les builds restent lents :
-  - regarder d'abord les logs `pip install` / `npm ci`
-  - verifier que `requirements.txt` / `package-lock.json` n'ont pas change
-  - eviter `--build` quand ce n'est pas necessaire
-
-## Validation effectuee localement
-
-- `python -m compileall services/ocr/app`
-- `python -m compileall services/anpr/app services/anpr/src`
-- `npm ci && npm run build` dans `frontend/`
+Commandes de verification deja utilisees sur le projet :
+- `npm run build` dans `frontend/`
+- `docker compose up -d --build nginx`
 - `docker compose config`
+
+---
+
+Pour toute modification UI: rebuild `nginx`.
+Pour toute modification backend: rebuild le service concerne (`service-ocr` ou `service-mlpdr`).
