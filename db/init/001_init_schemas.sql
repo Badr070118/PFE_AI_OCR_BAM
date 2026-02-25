@@ -1,0 +1,2 @@
+CREATE SCHEMA IF NOT EXISTS ocr_schema;
+CREATE SCHEMA IF NOT EXISTS mlpdr_schema;

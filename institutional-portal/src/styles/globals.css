@@ -1,0 +1,90 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 247 247 244;
+  --surface: 255 255 255;
+  --surface-soft: 243 244 246;
+  --text: 31 41 55;
+  --muted: 107 114 128;
+  --primary: 33 46 78;
+  --primary-2: 49 62 100;
+  --accent: 179 145 74;
+  --accent-2: 209 176 114;
+  --border: 218 221 228;
+  --ring: 56 88 153;
+}
+
+.dark {
+  --bg: 14 19 31;
+  --surface: 20 28 44;
+  --surface-soft: 30 38 58;
+  --text: 233 236 243;
+  --muted: 165 173 190;
+  --primary: 110 137 201;
+  --primary-2: 129 155 218;
+  --accent: 209 176 114;
+  --accent-2: 225 196 137;
+  --border: 57 69 96;
+  --ring: 143 173 240;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply m-0 bg-page text-ink font-sans;
+  }
+
+  * {
+    @apply border-border/70;
+  }
+
+  a {
+    @apply text-inherit no-underline;
+  }
+
+  button,
+  [role="button"],
+  a,
+  input,
+  summary {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-page;
+  }
+}
+
+@layer components {
+  .glass-line {
+    background-image:
+      linear-gradient(to right, rgb(var(--accent) / 0.32), transparent 35%, transparent 65%, rgb(var(--primary) / 0.18));
+  }
+
+  .paper-grid {
+    background-image:
+      linear-gradient(rgb(var(--border) / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border) / 0.35) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  .hero-panel {
+    background:
+      radial-gradient(70% 120% at 15% 15%, rgb(var(--accent) / 0.18), transparent 60%),
+      radial-gradient(65% 95% at 85% 30%, rgb(var(--primary) / 0.18), transparent 60%),
+      linear-gradient(160deg, rgb(var(--surface)) 0%, rgb(var(--surface-soft)) 100%);
+  }
+
+  .nav-shadow {
+    box-shadow: 0 12px 35px -24px rgba(15, 23, 42, 0.35);
+  }
+
+  .institution-card {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.7) inset,
+      0 18px 40px -28px rgba(17, 24, 39, 0.18);
+  }
+}

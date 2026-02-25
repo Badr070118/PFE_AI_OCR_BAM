@@ -1,0 +1,164 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pfe-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: pfe-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: pfe-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+    entrypoint: ["/bin/sh", "-lc"]
+    command:
+      - "export OLLAMA_HOST=http://ollama:11434 && ollama pull ${OLLAMA_MODEL:-llama3.1:8b}"
+    restart: "no"
+
+  service-ocr:
+    build:
+      context: ./services/ocr
+    container_name: pfe-service-ocr
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DB_SCHEMA: ${OCR_DB_SCHEMA:-ocr_schema}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+      APP_ENV: ${APP_ENV:-production}
+      OCR_UPLOAD_DIR: ${OCR_UPLOAD_DIR:-/srv/service/uploads}
+      OCR_RESULTS_DIR: ${OCR_RESULTS_DIR:-/srv/service/results}
+      UPLOADS_DIR: ${OCR_UPLOAD_DIR:-/srv/service/uploads}
+      RESULTS_DIR: ${OCR_RESULTS_DIR:-/srv/service/results}
+      LEGACY_OCR_MODELS_DIR: /srv/service/models
+      LLAMA_CPP_URL: ${LLAMA_CPP_URL:-http://host.docker.internal:8081/completion}
+      LLAMA_CPP_MODEL: ${LLAMA_CPP_MODEL:-local-model}
+      LLAMA_TEMPERATURE: ${LLAMA_TEMPERATURE:-0.1}
+      LLAMA_MAX_TOKENS: ${LLAMA_MAX_TOKENS:-800}
+      LLAMA_TOP_P: ${LLAMA_TOP_P:-0.9}
+      LLAMA_HTTP_TIMEOUT_SECONDS: ${LLAMA_HTTP_TIMEOUT_SECONDS:-120}
+      LLAMA_HTTP_RETRIES: ${LLAMA_HTTP_RETRIES:-1}
+      LLAMA_HTTP_RETRY_BACKOFF_SECONDS: ${LLAMA_HTTP_RETRY_BACKOFF_SECONDS:-0.75}
+      LLAMA_STOP_SEQUENCES: "${LLAMA_STOP_SEQUENCES:-```|</json>|<|eot_id|>}"
+      LLAMA_DEBUG: ${LLAMA_DEBUG:-0}
+      LLM_FALLBACK_OLLAMA: ${LLM_FALLBACK_OLLAMA:-1}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-180}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    ports:
+      - "${OCR_SERVICE_PORT:-8001}:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ocr_uploads:/srv/service/uploads
+      - ocr_results:/srv/service/results
+      - ./Projet_OCR_BAM/models:/srv/service/models:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()\"",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  service-mlpdr:
+    build:
+      context: ./services/anpr
+    container_name: pfe-service-mlpdr
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DB_SCHEMA: ${MLPDR_DB_SCHEMA:-mlpdr_schema}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+      APP_ENV: ${APP_ENV:-production}
+      MLPDR_OUTPUT_DIR: /srv/service/outputs
+      MLPDR_DETECTION_WEIGHTS_PATH: ${MLPDR_DETECTION_WEIGHTS_PATH:-/srv/service/weights/detection/yolov3-detection_final.weights}
+      MLPDR_DETECTION_CFG_PATH: ${MLPDR_DETECTION_CFG_PATH:-/srv/service/weights/detection/yolov3-detection.cfg}
+      MLPDR_OCR_WEIGHTS_PATH: ${MLPDR_OCR_WEIGHTS_PATH:-/srv/service/weights/ocr/yolov3-ocr_final.weights}
+      MLPDR_OCR_CFG_PATH: ${MLPDR_OCR_CFG_PATH:-/srv/service/weights/ocr/yolov3-ocr.cfg}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${MLPDR_SERVICE_PORT:-8002}:8000"
+    volumes:
+      - mlpdr_outputs:/srv/service/outputs
+      - ./MLPDR-main/MLPDR-main/weights:/srv/service/weights:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()\"",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    container_name: pfe-nginx
+    restart: unless-stopped
+    depends_on:
+      service-ocr:
+        condition: service_healthy
+      service-mlpdr:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    volumes:
+      - nginx_logs:/var/log/nginx
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health/ocr >/dev/null && wget -qO- http://127.0.0.1/health/mlpdr >/dev/null"]
+      # legacy /health/anpr is still redirected in nginx
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres_data:
+  ollama_data:
+  ocr_uploads:
+  ocr_results:
+  mlpdr_outputs:
+  nginx_logs:

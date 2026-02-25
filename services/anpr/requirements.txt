@@ -1,0 +1,13 @@
+fastapi==0.121.0
+uvicorn[standard]==0.38.0
+python-multipart==0.0.20
+numpy==1.26.4
+opencv-python-headless==4.10.0.84
+Pillow==10.4.0
+pytesseract==0.3.13
+arabic-reshaper==3.0.0
+python-bidi==0.6.7
+sqlalchemy
+psycopg[binary]
+pydantic
+pydantic-settings

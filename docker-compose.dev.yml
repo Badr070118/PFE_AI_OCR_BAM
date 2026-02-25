@@ -1,0 +1,44 @@
+services:
+  service-ocr:
+    environment:
+      APP_ENV: development
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload",
+        "--reload-dir",
+        "/srv/service/app",
+      ]
+    volumes:
+      - ./services/ocr/app:/srv/service/app
+      - ocr_uploads:/srv/service/uploads
+      - ocr_results:/srv/service/results
+      - ./Projet_OCR_BAM/models:/srv/service/models:ro
+
+  service-mlpdr:
+    environment:
+      APP_ENV: development
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload",
+        "--reload-dir",
+        "/srv/service/app",
+        "--reload-dir",
+        "/srv/service/src",
+      ]
+    volumes:
+      - ./services/anpr/app:/srv/service/app
+      - ./services/anpr/src:/srv/service/src
+      - mlpdr_outputs:/srv/service/outputs
+      - ./MLPDR-main/MLPDR-main/weights:/srv/service/weights:ro

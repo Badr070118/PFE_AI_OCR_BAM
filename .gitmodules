@@ -1,0 +1,6 @@
+[submodule "MLPDR-main"]
+	path = MLPDR-main
+	url = https://github.com/Badr070118/OCR_Plaque_Morocco.git
+[submodule "Projet_OCR_BAM"]
+	path = Projet_OCR_BAM
+	url = https://github.com/Badr070118/OCR_Docs_PFE.git

@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+python-multipart
+sqlalchemy
+psycopg[binary]
+pydantic
+pydantic-settings
+requests
+pillow
+pymupdf
+numpy
+opencv-python-headless
+rapidocr-onnxruntime
+pytesseract
+
