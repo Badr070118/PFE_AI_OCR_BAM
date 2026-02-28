@@ -83,6 +83,7 @@ export default function OcrPage() {
           text={uploadResult?.raw_text || ""}
           loading={uploadLoading}
           detection={uploadResult?.doc_type_detection || null}
+          tablesHtml={uploadResult?.tables_html || []}
         />
 
         <DocumentsList

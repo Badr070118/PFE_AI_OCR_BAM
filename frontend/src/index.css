@@ -297,6 +297,50 @@ textarea:focus-visible {
   line-height: 1.5;
 }
 
+.tables-section {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.tables-section h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.table-card {
+  border: 1px solid rgba(var(--border-rgb), 1);
+  border-radius: 12px;
+  background: rgba(var(--surface-rgb), 0.92);
+  padding: 10px;
+}
+
+.table-card h4 {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+  color: rgb(var(--primary-rgb));
+}
+
+.table-html {
+  overflow-x: auto;
+}
+
+.table-html table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.84rem;
+}
+
+.table-html th,
+.table-html td {
+  border: 1px solid rgba(var(--border-rgb), 1);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
 .textarea {
   width: 100%;
   border-radius: 14px;

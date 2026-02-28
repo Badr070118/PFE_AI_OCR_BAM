@@ -10,17 +10,23 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /srv/service
 
+ARG INSTALL_STRUCTURED_EXTRAS=0
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
+    poppler-utils \
+    ghostscript \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
+COPY requirements.structured_optional.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install --upgrade pip setuptools wheel && \
-    pip install -r requirements.txt
+    pip install -r requirements.txt && \
+    if [ "$INSTALL_STRUCTURED_EXTRAS" = "1" ]; then pip install -r requirements.structured_optional.txt; fi
 
 COPY app ./app
 

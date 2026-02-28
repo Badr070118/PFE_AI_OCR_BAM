@@ -11,6 +11,10 @@ class DocumentOut(BaseModel):
     raw_text: Optional[str] = None
     llama_output: Optional[str] = None
     doc_type_detection: Optional[Dict[str, Any]] = None
+    structured_extraction: Optional[Dict[str, Any]] = None
+    tables_html: Optional[list[Dict[str, Any]]] = None
+    pdf_kind_detection: Optional[Dict[str, Any]] = None
+    structured_extraction_error: Optional[str] = None
     date_uploaded: datetime
 
     class Config:

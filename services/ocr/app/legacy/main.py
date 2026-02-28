@@ -1,6 +1,7 @@
 import json
 import shutil
 import os
+import logging
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -11,6 +12,13 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.document_router.router import choose_extractor_name, detect_document_type
+from app.structured_extraction import (
+    build_structured_extraction,
+    detect_pdf_kind,
+    extract_native_pdf,
+    extract_scanned,
+    tables_to_html_payload,
+)
 from app.legacy.db import (
     Document,
     create_db_and_tables,
@@ -36,6 +44,7 @@ from app.legacy.review.router import review_router
 from app.legacy.schemas import DocumentAskRequest, DocumentAskResponse, DocumentOut
 
 FASTAPI_ROOT_PATH = (os.getenv("FASTAPI_ROOT_PATH") or "").strip()
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="GLM-OCR API",
@@ -145,6 +154,39 @@ def _extract_structured_data(
     return format_extracted_text_as_json(ocr_text)
 
 
+def _run_structured_extraction(file_path: Path) -> tuple[dict | None, dict | None, str | None]:
+    suffix = file_path.suffix.lower()
+    if suffix not in ALLOWED_EXTENSIONS:
+        return None, None, None
+
+    pdf_kind_detection: dict | None = None
+    try:
+        if suffix == ".pdf":
+            pdf_kind_detection = detect_pdf_kind(str(file_path))
+            if pdf_kind_detection.get("kind") == "native":
+                raw = extract_native_pdf(str(file_path))
+                doc_kind = "native"
+            else:
+                raw = extract_scanned(str(file_path))
+                doc_kind = "scan"
+        else:
+            raw = extract_scanned(str(file_path))
+            doc_kind = "image"
+
+        structured = build_structured_extraction(
+            doc_kind=doc_kind,
+            engine=str(raw.get("engine", "unknown")),
+            raw_text=str(raw.get("raw_text", "")),
+            lines=raw.get("lines") if isinstance(raw.get("lines"), list) else [],
+            tables=raw.get("tables") if isinstance(raw.get("tables"), list) else [],
+            meta=raw.get("meta") if isinstance(raw.get("meta"), dict) else {},
+        )
+        return structured, pdf_kind_detection, None
+    except Exception as exc:
+        logger.warning("Structured extraction error (%s): %s", file_path, exc)
+        return None, pdf_kind_detection, str(exc)
+
+
 @app.post("/detect-type", tags=["ocr"])
 def detect_type(payload: DetectTypeRequest) -> dict[str, Any]:
     text = payload.text or ""
@@ -170,9 +212,18 @@ async def upload_file(
     with destination.open("wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    structured_extraction, pdf_kind_detection, structured_error = _run_structured_extraction(destination)
+
     try:
         extracted_text = extract_text_with_glm_ocr(str(destination))
-        detection = detect_document_type(extracted_text, None)
+        extracted_text = extracted_text or ""
+        if not extracted_text and structured_extraction:
+            extracted_text = structured_extraction.get("raw_text", "") or ""
+
+        detection_source_text = (
+            structured_extraction.get("raw_text", "") if structured_extraction else extracted_text
+        )
+        detection = detect_document_type(detection_source_text or extracted_text, None)
 
         selected_doc_type = detection.get("doc_type", "unknown")
         override_type = _normalize_doc_type_override(forced_doc_type)
@@ -190,7 +241,7 @@ async def upload_file(
             doc_type=str(selected_doc_type),
             extractor_name=extractor_name,
             file_path=destination,
-            ocr_text=extracted_text,
+            ocr_text=detection_source_text or extracted_text,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -199,6 +250,14 @@ async def upload_file(
         db, file_name=original_name, data=structured_data, raw_text=extracted_text
     )
     setattr(document, "doc_type_detection", detection)
+    setattr(document, "structured_extraction", structured_extraction)
+    setattr(
+        document,
+        "tables_html",
+        tables_to_html_payload(structured_extraction) if structured_extraction else [],
+    )
+    setattr(document, "pdf_kind_detection", pdf_kind_detection)
+    setattr(document, "structured_extraction_error", structured_error)
     return document
 
 
@@ -215,13 +274,25 @@ async def run_local_ocr(file: UploadFile = File(...)) -> dict:
     with destination.open("wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    structured_extraction, pdf_kind_detection, structured_error = _run_structured_extraction(destination)
+
     try:
         text = extract_text_with_local_ocr(str(destination))
+        text = text or ""
+        if not text and structured_extraction:
+            text = structured_extraction.get("raw_text", "") or ""
         detection = detect_document_type(text, None)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    return {"text": text, "doc_type_detection": detection}
+    return {
+        "text": text,
+        "doc_type_detection": detection,
+        "structured_extraction": structured_extraction,
+        "tables_html": tables_to_html_payload(structured_extraction) if structured_extraction else [],
+        "pdf_kind_detection": pdf_kind_detection,
+        "structured_extraction_error": structured_error,
+    }
 
 
 @app.post("/ocr/invoice-table", tags=["ocr"])

@@ -1,0 +1,6 @@
+# Optional structured extraction extras.
+# Install only if you want native table extraction with Camelot and
+# scan layout extraction with PaddleOCR/PP-Structure.
+camelot-py
+ghostscript
+paddleocr

@@ -1,3 +1,5 @@
+import DOMPurify from "dompurify";
+
 const DOC_TYPE_LABELS = {
   invoice: "Invoice",
   bank_statement: "Bank statement",
@@ -6,9 +8,10 @@ const DOC_TYPE_LABELS = {
   unknown: "Unknown",
 };
 
-export default function OcrResult({ text, loading, detection }) {
+export default function OcrResult({ text, loading, detection, tablesHtml }) {
   const confidence = Number(detection?.confidence || 0);
   const isWeak = detection?.doc_type === "unknown" || confidence < 0.6;
+  const safeTables = Array.isArray(tablesHtml) ? tablesHtml : [];
 
   return (
     <section className="panel result-panel">
@@ -44,6 +47,26 @@ export default function OcrResult({ text, loading, detection }) {
         <p className="state">Upload a file to see the OCR text.</p>
       )}
       {!loading && text && <pre className="result">{text}</pre>}
+
+      {!loading && safeTables.length > 0 && (
+        <div className="tables-section">
+          <h3>Tables (detected)</h3>
+          {safeTables.map((table, index) => {
+            const page = Number(table?.page || index + 1);
+            const rawHtml = String(table?.html || "");
+            const sanitized = DOMPurify.sanitize(rawHtml);
+            return (
+              <article className="table-card" key={`${page}-${index}`}>
+                <h4>Table page {page}</h4>
+                <div
+                  className="table-html"
+                  dangerouslySetInnerHTML={{ __html: sanitized }}
+                />
+              </article>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }

@@ -12,4 +12,5 @@ numpy
 opencv-python-headless
 rapidocr-onnxruntime
 pytesseract
-
+pdfplumber
+pdf2image
