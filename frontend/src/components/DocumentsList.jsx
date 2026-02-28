@@ -28,12 +28,8 @@ export default function DocumentsList({ refreshKey, onOpenReview }) {
         if (isMounted) {
           const items = Array.isArray(data) ? data : [];
           setDocuments(items);
-          setSelectedId((current) => {
-            if (current && items.some((doc) => doc.id === current)) {
-              return current;
-            }
-            return items.length > 0 ? items[0].id : null;
-          });
+          // Always focus the latest uploaded document (API is ordered DESC).
+          setSelectedId(items.length > 0 ? items[0].id : null);
         }
       })
       .catch((err) => {

@@ -10,6 +10,7 @@ class DocumentOut(BaseModel):
     data: Dict[str, Any]
     raw_text: Optional[str] = None
     llama_output: Optional[str] = None
+    doc_type_detection: Optional[Dict[str, Any]] = None
     date_uploaded: datetime
 
     class Config:

@@ -257,6 +257,34 @@ textarea:focus-visible {
   color: #b42318;
 }
 
+.state.warn {
+  color: #9a6700;
+}
+
+.detection-card {
+  border: 1px solid rgba(var(--border-rgb), 1);
+  border-radius: 12px;
+  background: rgba(var(--surface-rgb), 0.9);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.detection-card.weak {
+  border-color: rgba(154, 103, 0, 0.4);
+  background: rgba(250, 230, 170, 0.22);
+}
+
+.detection-reasons {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.detection-reasons li + li {
+  margin-top: 4px;
+}
+
 .result {
   background: #0f172a;
   color: #eef2ff;

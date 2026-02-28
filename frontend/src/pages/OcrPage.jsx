@@ -12,17 +12,23 @@ export default function OcrPage() {
   const [uploadResult, setUploadResult] = useState(null);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [manualTypeHint, setManualTypeHint] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const handleUpload = async (file) => {
+  const handleUpload = async (file, forcedDocType = null) => {
     // Upload -> show latest result -> refresh documents list.
     setUploadLoading(true);
     setUploadError("");
     setUploadResult(null);
+    setManualTypeHint(false);
 
     try {
-      const data = await uploadDocument(file);
+      const data = await uploadDocument(file, { forcedDocType: forcedDocType || "" });
       setUploadResult(data);
+      const detection = data?.doc_type_detection || null;
+      const confidence = Number(detection?.confidence || 0);
+      const isWeak = detection?.doc_type === "unknown" || confidence < 0.6;
+      setManualTypeHint(isWeak && !forcedDocType);
       setRefreshKey((prev) => prev + 1);
     } catch (err) {
       setUploadError(err?.response?.data?.detail || err.message || "Upload failed");
@@ -66,9 +72,18 @@ export default function OcrPage() {
       </header>
 
       <main className="grid">
-        <UploadForm onUpload={handleUpload} loading={uploadLoading} error={uploadError} />
+        <UploadForm
+          onUpload={handleUpload}
+          loading={uploadLoading}
+          error={uploadError}
+          manualTypeHint={manualTypeHint}
+        />
 
-        <OcrResult text={uploadResult?.raw_text || ""} loading={uploadLoading} />
+        <OcrResult
+          text={uploadResult?.raw_text || ""}
+          loading={uploadLoading}
+          detection={uploadResult?.doc_type_detection || null}
+        />
 
         <DocumentsList
           refreshKey={refreshKey}

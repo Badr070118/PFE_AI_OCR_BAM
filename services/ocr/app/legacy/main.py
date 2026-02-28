@@ -5,11 +5,12 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.document_router.router import choose_extractor_name, detect_document_type
 from app.legacy.db import (
     Document,
     create_db_and_tables,
@@ -96,6 +97,11 @@ class UpdateDocumentDataRequest(BaseModel):
     merge: bool = True
 
 
+class DetectTypeRequest(BaseModel):
+    text: str
+    lines: list[str] | None = None
+
+
 def _is_allowed_upload(file: UploadFile) -> bool:
     extension = Path(file.filename or "").suffix.lower()
     if file.content_type in ALLOWED_CONTENT_TYPES:
@@ -103,9 +109,55 @@ def _is_allowed_upload(file: UploadFile) -> bool:
     return extension in ALLOWED_EXTENSIONS
 
 
+def _normalize_doc_type_override(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if normalized in {"invoice", "bank_statement", "payment_receipt", "wire_transfer"}:
+        return normalized
+    return None
+
+
+def _extract_structured_data(
+    *,
+    doc_type: str,
+    extractor_name: str,
+    file_path: Path,
+    ocr_text: str,
+) -> dict[str, Any]:
+    if extractor_name == "invoice_table":
+        try:
+            invoice_result = invoice_ocr(str(file_path), save_debug=False)
+            return {
+                "table_rows_structured": invoice_result.get("table_rows_structured", []),
+                "quality_metrics": invoice_result.get("quality_metrics", {}),
+                "warnings": invoice_result.get("warnings", []),
+                "doc_type": doc_type,
+                "extractor": extractor_name,
+            }
+        except Exception:
+            # Keep service resilient: fallback to legacy generic parser.
+            pass
+
+    if extractor_name == "raw_text_only":
+        return {}
+
+    return format_extracted_text_as_json(ocr_text)
+
+
+@app.post("/detect-type", tags=["ocr"])
+def detect_type(payload: DetectTypeRequest) -> dict[str, Any]:
+    text = payload.text or ""
+    if not text.strip() and payload.lines:
+        text = "\n".join(payload.lines)
+    return detect_document_type(text, payload.lines)
+
+
 @app.post("/upload", response_model=DocumentOut, tags=["documents"])
 async def upload_file(
-    file: UploadFile = File(...), db: Session = Depends(get_db)
+    file: UploadFile = File(...),
+    forced_doc_type: str | None = Form(default=None),
+    db: Session = Depends(get_db),
 ) -> Document:
     if not _is_allowed_upload(file):
         raise HTTPException(status_code=400, detail="Unsupported file type.")
@@ -120,13 +172,33 @@ async def upload_file(
 
     try:
         extracted_text = extract_text_with_glm_ocr(str(destination))
-        structured_data = format_extracted_text_as_json(extracted_text)
+        detection = detect_document_type(extracted_text, None)
+
+        selected_doc_type = detection.get("doc_type", "unknown")
+        override_type = _normalize_doc_type_override(forced_doc_type)
+        if override_type is not None:
+            selected_doc_type = override_type
+            detection = {
+                "doc_type": override_type,
+                "confidence": 1.0,
+                "reasons": (detection.get("reasons") or [])
+                + [f"type force par l'utilisateur: {override_type}"],
+            }
+
+        extractor_name = choose_extractor_name(str(selected_doc_type))
+        structured_data = _extract_structured_data(
+            doc_type=str(selected_doc_type),
+            extractor_name=extractor_name,
+            file_path=destination,
+            ocr_text=extracted_text,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     document = save_document(
         db, file_name=original_name, data=structured_data, raw_text=extracted_text
     )
+    setattr(document, "doc_type_detection", detection)
     return document
 
 
@@ -145,10 +217,11 @@ async def run_local_ocr(file: UploadFile = File(...)) -> dict:
 
     try:
         text = extract_text_with_local_ocr(str(destination))
+        detection = detect_document_type(text, None)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    return {"text": text}
+    return {"text": text, "doc_type_detection": detection}
 
 
 @app.post("/ocr/invoice-table", tags=["ocr"])

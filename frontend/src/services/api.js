@@ -7,9 +7,13 @@ const api = axios.create({
   timeout: 30000,
 });
 
-export async function uploadDocument(file) {
+export async function uploadDocument(file, options = {}) {
   const formData = new FormData();
   formData.append("file", file);
+  const forcedDocType = (options.forcedDocType || "").trim();
+  if (forcedDocType) {
+    formData.append("forced_doc_type", forcedDocType);
+  }
 
   const response = await api.post("/upload", formData, {
     headers: { "Content-Type": "multipart/form-data" },

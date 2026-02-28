@@ -1,14 +1,15 @@
 import { useState } from "react";
 
-export default function UploadForm({ onUpload, loading, error }) {
+export default function UploadForm({ onUpload, loading, error, manualTypeHint }) {
   const [file, setFile] = useState(null);
+  const [forcedDocType, setForcedDocType] = useState("");
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!file || loading) {
       return;
     }
-    await onUpload(file);
+    await onUpload(file, forcedDocType || null);
   };
 
   return (
@@ -27,10 +28,31 @@ export default function UploadForm({ onUpload, loading, error }) {
         <span>{file ? file.name : "Choose a file"}</span>
       </label>
 
+      <label className="field">
+        <span>Document type override (optional)</span>
+        <select
+          className="input"
+          value={forcedDocType}
+          onChange={(event) => setForcedDocType(event.target.value)}
+          disabled={loading}
+        >
+          <option value="">Auto detect</option>
+          <option value="invoice">Invoice</option>
+          <option value="bank_statement">Bank statement</option>
+          <option value="payment_receipt">Payment receipt</option>
+          <option value="wire_transfer">Wire transfer</option>
+        </select>
+      </label>
+
       <button className="btn primary" type="submit" disabled={!file || loading}>
         {loading ? "Uploading..." : "Upload"}
       </button>
 
+      {manualTypeHint && (
+        <p className="state warn">
+          Type detection is uncertain. Choose a document type override, then upload again.
+        </p>
+      )}
       {error && <p className="state error">Error: {error}</p>}
     </form>
   );
