@@ -168,11 +168,33 @@ export default function DocumentsList({ refreshKey, onOpenReview }) {
       );
     }
 
-    const jsonPayload = pendingStructured || selectedDoc.data || {};
+    const templateJson =
+      selectedDoc.extracted_json_template &&
+      typeof selectedDoc.extracted_json_template === "object"
+        ? selectedDoc.extracted_json_template
+        : null;
+    const templateMeta =
+      selectedDoc.template_extraction_meta &&
+      typeof selectedDoc.template_extraction_meta === "object"
+        ? selectedDoc.template_extraction_meta
+        : null;
+    const hasTemplateData =
+      templateJson && Object.keys(templateJson).length > 0;
+    const jsonPayload =
+      pendingStructured || (hasTemplateData ? templateJson : selectedDoc.data || {});
+    const templateConfidence = Number(templateMeta?.confidence || 0);
+
     return (
       <>
         {pendingStructured && (
           <p className="state">Apercu JSON non sauvegarde. Clique "Sauvegarder JSON en base".</p>
+        )}
+        {!pendingStructured && hasTemplateData && (
+          <p className="state">
+            <span className="template-badge">
+              Template extraction ({Math.round(templateConfidence * 100)}%)
+            </span>
+          </p>
         )}
         <pre className="doc-content">{JSON.stringify(jsonPayload, null, 2)}</pre>
       </>

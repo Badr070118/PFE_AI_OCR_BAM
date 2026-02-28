@@ -1,0 +1,53 @@
+{
+  "doc_type": "wire_transfer",
+  "template_file": "wire_transfer_template.json",
+  "anchors": {
+    "document_title": ["ORDRE DE VIREMENT"],
+    "reference": ["Reference"],
+    "sender": ["EMETTEUR", "Nom", "Banque", "Compte", "Adresse"],
+    "beneficiary": ["BENEFICIAIRE", "Nom", "Banque beneficiaire", "IBAN", "RIB"],
+    "transfer": ["DETAILS VIREMENT", "Motif", "Montant", "Frais", "Total", "Devise"],
+    "execution": ["EXECUTION", "Date ordre", "Date execution", "Statut"]
+  },
+  "schema": {
+    "reference": "",
+    "sender_name": "",
+    "sender_bank": "",
+    "sender_account": "",
+    "sender_address": "",
+    "beneficiary_name": "",
+    "beneficiary_bank": "",
+    "beneficiary_iban": "",
+    "beneficiary_rib": "",
+    "purpose": "",
+    "amount": "",
+    "fees": "",
+    "total": "",
+    "currency": "MAD",
+    "order_date": "",
+    "execution_date": "",
+    "status": ""
+  },
+  "required_fields": ["reference", "amount", "execution_date"],
+  "fields_rules": {
+    "reference": [
+      {"type": "regex", "pattern": "Reference\\s*:\\s*(TRF-\\d{4}-\\d{6})"},
+      {"type": "after_colon", "labels": ["Reference"]}
+    ],
+    "sender_name": [{"type": "after_colon", "labels": ["Nom"]}],
+    "sender_bank": [{"type": "after_colon", "labels": ["Banque"]}],
+    "sender_account": [{"type": "after_colon", "labels": ["Compte"]}],
+    "sender_address": [{"type": "after_colon", "labels": ["Adresse"]}],
+    "beneficiary_bank": [{"type": "after_colon", "labels": ["Banque beneficiaire"]}],
+    "beneficiary_iban": [{"type": "after_colon", "labels": ["IBAN"]}],
+    "beneficiary_rib": [{"type": "after_colon", "labels": ["RIB"]}],
+    "purpose": [{"type": "after_colon", "labels": ["Motif"]}],
+    "amount": [{"type": "regex", "pattern": "Montant\\s*:\\s*([0-9\\s.,]+\\s*MAD)"}],
+    "fees": [{"type": "regex", "pattern": "Frais\\s*:\\s*([0-9\\s.,]+\\s*MAD)"}],
+    "total": [{"type": "regex", "pattern": "Total\\s*:\\s*([0-9\\s.,]+\\s*MAD)"}],
+    "currency": [{"type": "after_colon", "labels": ["Devise"]}],
+    "order_date": [{"type": "regex", "pattern": "Date ordre\\s*:\\s*([0-9]{2}/[0-9]{2}/[0-9]{4})"}],
+    "execution_date": [{"type": "regex", "pattern": "Date execution\\s*:\\s*([0-9]{2}/[0-9]{2}/[0-9]{4})"}],
+    "status": [{"type": "after_colon", "labels": ["Statut"]}]
+  }
+}

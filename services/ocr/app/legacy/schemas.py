@@ -17,6 +17,8 @@ class DocumentOut(BaseModel):
     structured_extraction_error: Optional[str] = None
     structured_pages_html: Optional[Dict[str, Any]] = None
     structured_html: Optional[str] = None
+    extracted_json_template: Optional[Dict[str, Any]] = None
+    template_extraction_meta: Optional[Dict[str, Any]] = None
     date_uploaded: datetime
 
     class Config:

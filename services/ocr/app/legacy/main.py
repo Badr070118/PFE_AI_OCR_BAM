@@ -21,6 +21,7 @@ from app.structured_extraction import (
     render_structured_html,
     tables_to_html_payload,
 )
+from app.template_engine import extract_with_template
 from app.legacy.db import (
     Document,
     create_db_and_tables,
@@ -211,6 +212,36 @@ def _render_structured_payload(
     return {"pages": []}, ""
 
 
+def _extract_template_payload(
+    *,
+    doc_type: str,
+    raw_text: str,
+    lines: list[dict[str, Any]] | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    fallback_meta: dict[str, Any] = {
+        "doc_type": doc_type or "unknown",
+        "confidence": 0.0,
+        "missing_fields": [],
+        "used_template": "",
+        "evidence": {},
+    }
+    if not (raw_text or "").strip():
+        return {}, fallback_meta
+
+    try:
+        payload = extract_with_template(doc_type, raw_text, lines)
+        data = payload.get("data") if isinstance(payload, dict) else {}
+        meta = payload.get("meta") if isinstance(payload, dict) else {}
+        return (
+            data if isinstance(data, dict) else {},
+            meta if isinstance(meta, dict) else fallback_meta,
+        )
+    except Exception as exc:
+        logger.warning("Template extraction error (%s): %s", doc_type, exc)
+        fallback_meta["error"] = str(exc)
+        return {}, fallback_meta
+
+
 @app.post("/detect-type", tags=["ocr"])
 def detect_type(payload: DetectTypeRequest) -> dict[str, Any]:
     text = payload.text or ""
@@ -267,6 +298,16 @@ async def upload_file(
             file_path=destination,
             ocr_text=detection_source_text or extracted_text,
         )
+        template_json, template_meta = _extract_template_payload(
+            doc_type=str(selected_doc_type),
+            raw_text=detection_source_text or extracted_text,
+            lines=(
+                structured_extraction.get("lines")
+                if isinstance(structured_extraction, dict)
+                and isinstance(structured_extraction.get("lines"), list)
+                else None
+            ),
+        )
 
         structured_pages_html, structured_html = _render_structured_payload(
             structured_extraction,
@@ -289,6 +330,8 @@ async def upload_file(
     setattr(document, "structured_extraction_error", structured_error)
     setattr(document, "structured_pages_html", structured_pages_html)
     setattr(document, "structured_html", structured_html)
+    setattr(document, "extracted_json_template", template_json)
+    setattr(document, "template_extraction_meta", template_meta)
     return document
 
 
@@ -313,6 +356,16 @@ async def run_local_ocr(file: UploadFile = File(...)) -> dict:
         if not text and structured_extraction:
             text = structured_extraction.get("raw_text", "") or ""
         detection = detect_document_type(text, None)
+        template_json, template_meta = _extract_template_payload(
+            doc_type=str(detection.get("doc_type", "unknown")),
+            raw_text=text,
+            lines=(
+                structured_extraction.get("lines")
+                if isinstance(structured_extraction, dict)
+                and isinstance(structured_extraction.get("lines"), list)
+                else None
+            ),
+        )
         structured_pages_html, structured_html = _render_structured_payload(
             structured_extraction,
             fallback_text=text,
@@ -329,6 +382,8 @@ async def run_local_ocr(file: UploadFile = File(...)) -> dict:
         "structured_extraction_error": structured_error,
         "structured_pages_html": structured_pages_html,
         "structured_html": structured_html,
+        "extracted_json_template": template_json,
+        "template_extraction_meta": template_meta,
     }
 
 
@@ -355,7 +410,18 @@ async def run_invoice_table_ocr(file: UploadFile = File(...)) -> dict:
 
 @app.get("/documents", response_model=list[DocumentOut], tags=["documents"])
 def list_documents(db: Session = Depends(get_db)) -> list[Document]:
-    return db.query(Document).order_by(Document.date_uploaded.desc()).all()
+    documents = db.query(Document).order_by(Document.date_uploaded.desc()).all()
+    for document in documents:
+        raw_text = str(document.raw_text or "")
+        detection = detect_document_type(raw_text, None) if raw_text.strip() else {"doc_type": "unknown"}
+        template_json, template_meta = _extract_template_payload(
+            doc_type=str(detection.get("doc_type", "unknown")),
+            raw_text=raw_text,
+            lines=None,
+        )
+        setattr(document, "extracted_json_template", template_json)
+        setattr(document, "template_extraction_meta", template_meta)
+    return documents
 
 
 @app.post(

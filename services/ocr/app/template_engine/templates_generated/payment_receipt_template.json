@@ -1,0 +1,50 @@
+{
+  "doc_type": "payment_receipt",
+  "template_file": "payment_receipt_template.json",
+  "anchors": {
+    "document_title": ["RECU DE PAIEMENT"],
+    "reference": ["Reference"],
+    "details": ["DETAILS RECU", "Date", "Heure", "Canal", "Statut"],
+    "parties": ["PAYEUR BENEFICIAIRE", "Compte"],
+    "amounts": ["MONTANTS ET MOTIF", "Motif", "Montant", "Frais", "Total debite", "Devise"],
+    "transaction": ["INFORMATIONS TRANSACTION", "Transaction ID", "Auth code", "Canal securise"]
+  },
+  "schema": {
+    "reference": "",
+    "date": "",
+    "time": "",
+    "channel": "",
+    "status": "",
+    "payer_name": "",
+    "payer_account": "",
+    "beneficiary_name": "",
+    "beneficiary_account": "",
+    "purpose": "",
+    "amount": "",
+    "fees": "",
+    "total_debited": "",
+    "currency": "MAD",
+    "transaction_id": "",
+    "auth_code": "",
+    "secure_channel": ""
+  },
+  "required_fields": ["reference", "date", "amount", "transaction_id"],
+  "fields_rules": {
+    "reference": [
+      {"type": "regex", "pattern": "Reference\\s*:\\s*(TXN-\\d{4}-\\d{6})"},
+      {"type": "after_colon", "labels": ["Reference"]}
+    ],
+    "date": [{"type": "regex", "pattern": "Date\\s*:\\s*([0-9]{2}/[0-9]{2}/[0-9]{4})"}],
+    "time": [{"type": "regex", "pattern": "Heure\\s*:\\s*([0-9]{2}:[0-9]{2}:[0-9]{2})"}],
+    "channel": [{"type": "after_colon", "labels": ["Canal"]}],
+    "status": [{"type": "after_colon", "labels": ["Statut"]}],
+    "purpose": [{"type": "after_colon", "labels": ["Motif"]}],
+    "amount": [{"type": "regex", "pattern": "Montant\\s*:\\s*([0-9\\s.,]+\\s*MAD)"}],
+    "fees": [{"type": "regex", "pattern": "Frais\\s*:\\s*([0-9\\s.,]+\\s*MAD)"}],
+    "total_debited": [{"type": "regex", "pattern": "Total debite\\s*:\\s*([0-9\\s.,]+\\s*MAD)"}],
+    "currency": [{"type": "after_colon", "labels": ["Devise"]}],
+    "transaction_id": [{"type": "after_colon", "labels": ["Transaction ID"]}],
+    "auth_code": [{"type": "after_colon", "labels": ["Auth code"]}],
+    "secure_channel": [{"type": "after_colon", "labels": ["Canal securise"]}]
+  }
+}

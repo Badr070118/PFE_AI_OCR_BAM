@@ -1,0 +1,42 @@
+{
+  "doc_type": "bank_statement",
+  "template_file": "bank_statement_template.json",
+  "anchors": {
+    "document_title": ["RELEVE DE COMPTE"],
+    "reference": ["Reference"],
+    "account_info": ["INFORMATIONS COMPTE", "Banque", "Titulaire", "Compte", "IBAN", "Periode"],
+    "transactions_header": ["Date Libelle Debit Credit Solde"],
+    "summary": ["SYNTHESE PERIODE", "Total debit", "Total credit", "Solde debut", "Solde fin"]
+  },
+  "schema": {
+    "reference": "",
+    "bank_name": "",
+    "account_holder": "",
+    "account_number": "",
+    "iban": "",
+    "period": "",
+    "total_debit": "",
+    "total_credit": "",
+    "opening_balance": "",
+    "closing_balance": "",
+    "currency": "MAD",
+    "transactions": []
+  },
+  "required_fields": ["period", "closing_balance"],
+  "fields_rules": {
+    "reference": [
+      {"type": "regex", "pattern": "Reference\\s*:\\s*(STM-\\d{4}-\\d{6})"},
+      {"type": "after_colon", "labels": ["Reference"]}
+    ],
+    "bank_name": [{"type": "after_colon", "labels": ["Banque"]}],
+    "account_holder": [{"type": "after_colon", "labels": ["Titulaire"]}],
+    "account_number": [{"type": "after_colon", "labels": ["Compte"]}],
+    "iban": [{"type": "after_colon", "labels": ["IBAN"]}],
+    "period": [{"type": "after_colon", "labels": ["Periode"]}],
+    "total_debit": [{"type": "regex", "pattern": "Total debit\\s*:\\s*([0-9\\s.,]+\\s*MAD)"}],
+    "total_credit": [{"type": "regex", "pattern": "Total credit\\s*:\\s*([0-9\\s.,]+\\s*MAD)"}],
+    "opening_balance": [{"type": "regex", "pattern": "Solde debut\\s*:\\s*([0-9\\s.,]+\\s*MAD)"}],
+    "closing_balance": [{"type": "regex", "pattern": "Solde fin\\s*:\\s*([0-9\\s.,]+\\s*MAD)"}],
+    "currency": [{"type": "regex", "pattern": "\\b(MAD)\\b"}]
+  }
+}
