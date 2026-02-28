@@ -84,6 +84,8 @@ export default function OcrPage() {
           loading={uploadLoading}
           detection={uploadResult?.doc_type_detection || null}
           tablesHtml={uploadResult?.tables_html || []}
+          structuredPagesHtml={uploadResult?.structured_pages_html || null}
+          structuredHtml={uploadResult?.structured_html || ""}
         />
 
         <DocumentsList

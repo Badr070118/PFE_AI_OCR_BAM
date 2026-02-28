@@ -303,6 +303,76 @@ textarea:focus-visible {
   gap: 10px;
 }
 
+.view-toggle {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 10px;
+}
+
+.structured-pages {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.structured-page-card {
+  border: 1px solid rgba(var(--border-rgb), 1);
+  border-radius: 12px;
+  background: rgba(var(--surface-rgb), 0.95);
+  padding: 12px;
+}
+
+.structured-page-card h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  color: rgb(var(--primary-rgb));
+}
+
+.structured-render {
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.structured-render .doc {
+  display: block;
+}
+
+.structured-render .page {
+  display: grid;
+  gap: 8px;
+}
+
+.structured-render h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.structured-render p {
+  margin: 0;
+}
+
+.structured-render .columns {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.structured-render table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.structured-render th,
+.structured-render td {
+  border: 1px solid rgba(var(--border-rgb), 1);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
 .tables-section h3 {
   margin: 0;
   font-size: 1rem;
@@ -1213,6 +1283,10 @@ textarea:focus-visible {
   }
 
   .chat-input-row {
+    grid-template-columns: 1fr;
+  }
+
+  .structured-render .columns {
     grid-template-columns: 1fr;
   }
 

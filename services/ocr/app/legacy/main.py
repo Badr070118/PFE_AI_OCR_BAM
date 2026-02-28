@@ -14,9 +14,11 @@ from sqlalchemy.orm import Session
 from app.document_router.router import choose_extractor_name, detect_document_type
 from app.structured_extraction import (
     build_structured_extraction,
+    concat_structured_pages_html,
     detect_pdf_kind,
     extract_native_pdf,
     extract_scanned,
+    render_structured_html,
     tables_to_html_payload,
 )
 from app.legacy.db import (
@@ -187,6 +189,28 @@ def _run_structured_extraction(file_path: Path) -> tuple[dict | None, dict | Non
         return None, pdf_kind_detection, str(exc)
 
 
+def _render_structured_payload(
+    structured_extraction: dict | None,
+    *,
+    fallback_text: str = "",
+) -> tuple[dict, str]:
+    if isinstance(structured_extraction, dict):
+        rendered_pages = render_structured_html(structured_extraction)
+        return rendered_pages, concat_structured_pages_html(rendered_pages)
+
+    if fallback_text.strip():
+        rendered_pages = render_structured_html(
+            {
+                "raw_text": fallback_text,
+                "lines": [],
+                "tables": [],
+            }
+        )
+        return rendered_pages, concat_structured_pages_html(rendered_pages)
+
+    return {"pages": []}, ""
+
+
 @app.post("/detect-type", tags=["ocr"])
 def detect_type(payload: DetectTypeRequest) -> dict[str, Any]:
     text = payload.text or ""
@@ -243,6 +267,11 @@ async def upload_file(
             file_path=destination,
             ocr_text=detection_source_text or extracted_text,
         )
+
+        structured_pages_html, structured_html = _render_structured_payload(
+            structured_extraction,
+            fallback_text=detection_source_text or extracted_text,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -258,6 +287,8 @@ async def upload_file(
     )
     setattr(document, "pdf_kind_detection", pdf_kind_detection)
     setattr(document, "structured_extraction_error", structured_error)
+    setattr(document, "structured_pages_html", structured_pages_html)
+    setattr(document, "structured_html", structured_html)
     return document
 
 
@@ -282,6 +313,10 @@ async def run_local_ocr(file: UploadFile = File(...)) -> dict:
         if not text and structured_extraction:
             text = structured_extraction.get("raw_text", "") or ""
         detection = detect_document_type(text, None)
+        structured_pages_html, structured_html = _render_structured_payload(
+            structured_extraction,
+            fallback_text=text,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -292,6 +327,8 @@ async def run_local_ocr(file: UploadFile = File(...)) -> dict:
         "tables_html": tables_to_html_payload(structured_extraction) if structured_extraction else [],
         "pdf_kind_detection": pdf_kind_detection,
         "structured_extraction_error": structured_error,
+        "structured_pages_html": structured_pages_html,
+        "structured_html": structured_html,
     }
 
 
