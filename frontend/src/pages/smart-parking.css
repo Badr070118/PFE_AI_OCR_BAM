@@ -1,0 +1,408 @@
+.parking-app {
+  padding-bottom: 4rem;
+  position: relative;
+}
+
+.parking-app::before {
+  content: "";
+  position: absolute;
+  inset: -120px 0 auto 0;
+  height: 360px;
+  background: radial-gradient(circle at 15% 20%, rgba(237, 213, 175, 0.35), transparent 55%),
+    radial-gradient(circle at 80% 10%, rgba(203, 214, 226, 0.4), transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.parking-hero {
+  margin-bottom: 1.75rem;
+  position: relative;
+  z-index: 1;
+}
+
+.parking-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  position: relative;
+  z-index: 1;
+}
+
+.parking-section {
+  position: relative;
+  overflow: hidden;
+  animation: parking-fade-up 0.5s ease both;
+}
+
+.parking-section::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  pointer-events: none;
+}
+
+.parking-section .panel-header h2 {
+  letter-spacing: 0.01em;
+}
+
+.parking-section .panel-header p {
+  max-width: 42ch;
+}
+
+@keyframes parking-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 1100px) {
+  .parking-grid {
+    grid-template-columns: minmax(320px, 1.1fr) minmax(320px, 0.9fr);
+    grid-template-areas:
+      "detection gate"
+      "live stats"
+      "history alerts"
+      "chat chat";
+  }
+
+  .parking-section.detection {
+    grid-area: detection;
+  }
+
+  .parking-section.gate {
+    grid-area: gate;
+  }
+
+  .parking-section.live {
+    grid-area: live;
+  }
+
+  .parking-section.stats {
+    grid-area: stats;
+  }
+
+  .parking-section.history {
+    grid-area: history;
+  }
+
+  .parking-section.alerts {
+    grid-area: alerts;
+  }
+
+  .parking-section.chat {
+    grid-area: chat;
+  }
+}
+
+.parking-gate {
+  position: relative;
+  height: 140px;
+  border-radius: 16px;
+  background: linear-gradient(130deg, #f4f4f0, #e6e7df);
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.parking-gate-post {
+  position: absolute;
+  left: 18%;
+  bottom: 0;
+  width: 22px;
+  height: 60px;
+  background: #2f2f2f;
+  border-radius: 6px 6px 0 0;
+}
+
+.parking-gate-arm {
+  position: absolute;
+  left: 18%;
+  bottom: 48px;
+  width: 58%;
+  height: 10px;
+  background: linear-gradient(90deg, #d93f3f, #f6d365);
+  border-radius: 999px;
+  transform-origin: left center;
+  transition: transform 0.5s ease;
+}
+
+.parking-gate.open .parking-gate-arm {
+  transform: rotate(-25deg);
+}
+
+.parking-gate.closed .parking-gate-arm {
+  transform: rotate(0deg);
+}
+
+.parking-gate-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 1rem;
+}
+
+.parking-live {
+  display: grid;
+  gap: 1rem;
+}
+
+.parking-plate {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: linear-gradient(120deg, #0f172a, #334155);
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.parking-live-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.parking-live-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.parking-stats {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.parking-stats div {
+  background: #f8f7f2;
+  border-radius: 14px;
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.parking-stats strong {
+  font-size: 1.2rem;
+}
+
+.parking-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.parking-table th,
+.parking-table td {
+  text-align: left;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+}
+
+.parking-table td {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.parking-table thead th {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(15, 23, 42, 0.65);
+}
+
+.parking-table tbody tr:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.parking-alerts {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.parking-alerts h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.parking-alert-item {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.6rem;
+  background: #fff7f5;
+}
+
+.parking-chat {
+  display: grid;
+  gap: 1rem;
+}
+
+.parking-chat-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.parking-chat-chip {
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: #f8fafc;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.parking-chat-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 23, 42, 0.3);
+  box-shadow: 0 8px 14px rgba(15, 23, 42, 0.08);
+}
+
+.parking-chat-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+  transform: none;
+}
+
+.parking-chat-history {
+  max-height: 260px;
+  overflow: auto;
+  display: grid;
+  gap: 0.75rem;
+  padding-right: 0.35rem;
+}
+
+.parking-chat-bubble {
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: #f1f2f4;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.parking-chat-answer {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.parking-chat-answer-header {
+  margin: 0;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.parking-chat-answer-lines {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.parking-chat-table {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.parking-chat-table-header,
+.parking-chat-table-row {
+  display: grid;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.parking-chat-table-header {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(15, 23, 42, 0.6);
+  padding: 0 0.2rem;
+}
+
+.parking-chat-table-row {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.parking-chat-table-row .badge {
+  justify-self: start;
+}
+
+.status-authorized {
+  background: rgba(16, 185, 129, 0.14);
+  color: #0f5132;
+}
+
+.status-blacklisted {
+  background: rgba(239, 68, 68, 0.14);
+  color: #7f1d1d;
+}
+
+.status-unknown {
+  background: rgba(148, 163, 184, 0.2);
+  color: #334155;
+}
+
+.status-denied {
+  background: rgba(245, 158, 11, 0.2);
+  color: #92400e;
+}
+
+.parking-chat-answer-item {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.parking-chat-bubble.user {
+  background: #e3f3ff;
+  justify-self: end;
+  max-width: 85%;
+}
+
+.parking-chat-bubble.assistant {
+  max-width: 85%;
+}
+
+.parking-chat-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.parking-chat-form input {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  font-size: 0.95rem;
+  background: #ffffff;
+}
+
+.parking-chat-form button {
+  white-space: nowrap;
+}

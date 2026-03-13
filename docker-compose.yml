@@ -19,6 +19,27 @@ services:
       retries: 10
       start_period: 10s
 
+  mysql:
+    image: mysql:8.4
+    container_name: pfe-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-smart_parking}
+      MYSQL_USER: ${MYSQL_USER:-rag_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-rag_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./smart_parking_rag/mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u $$MYSQL_USER -p$$MYSQL_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   ollama:
     image: ollama/ollama:latest
     container_name: pfe-ollama
@@ -113,13 +134,21 @@ services:
       MLPDR_DETECTION_CFG_PATH: ${MLPDR_DETECTION_CFG_PATH:-/srv/service/weights/detection/yolov3-detection.cfg}
       MLPDR_OCR_WEIGHTS_PATH: ${MLPDR_OCR_WEIGHTS_PATH:-/srv/service/weights/ocr/yolov3-ocr_final.weights}
       MLPDR_OCR_CFG_PATH: ${MLPDR_OCR_CFG_PATH:-/srv/service/weights/ocr/yolov3-ocr.cfg}
+      ANPR_LLM_PROVIDER: ${ANPR_LLM_PROVIDER:-ollama}
+      ANPR_LLM_MODEL: ${ANPR_LLM_MODEL:-llama3.1:8b}
+      ANPR_LLM_TEMPERATURE: ${ANPR_LLM_TEMPERATURE:-0.1}
+      ANPR_LLM_TIMEOUT_SECONDS: ${ANPR_LLM_TIMEOUT_SECONDS:-3}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
     depends_on:
       postgres:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     ports:
       - "${MLPDR_SERVICE_PORT:-8002}:8000"
     volumes:
       - mlpdr_outputs:/srv/service/outputs
+      - mlpdr_stream:/srv/service/stream
       - ./MLPDR-main/MLPDR-main/weights:/srv/service/weights:ro
     healthcheck:
       test:
@@ -143,6 +172,8 @@ services:
         condition: service_healthy
       service-mlpdr:
         condition: service_healthy
+      smart-parking-rag:
+        condition: service_started
     ports:
       - "80:80"
     volumes:
@@ -155,10 +186,36 @@ services:
       retries: 10
       start_period: 10s
 
+  smart-parking-rag:
+    build:
+      context: ./smart_parking_rag
+    container_name: pfe-smart-parking-rag
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-rag_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-rag_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-smart_parking}
+      RAG_LLM_PROVIDER: ${RAG_LLM_PROVIDER:-auto}
+      RAG_LLM_MODEL: ${RAG_LLM_MODEL:-gpt-4o-mini}
+      RAG_LLM_TEMPERATURE: ${RAG_LLM_TEMPERATURE:-0.1}
+      RAG_LLM_TIMEOUT_SECONDS: ${RAG_LLM_TIMEOUT_SECONDS:-3}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      STREAMLIT_SERVER_BASE_URL_PATH: rag
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8501:8501"
+
 volumes:
   postgres_data:
   ollama_data:
   ocr_uploads:
   ocr_results:
   mlpdr_outputs:
+  mlpdr_stream:
   nginx_logs:
+  mysql_data:

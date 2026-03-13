@@ -1,1 +1,5 @@
-"""Service-level schemas live here if MLPDR request/response models are added later."""
+"""Service-level schemas for smart parking ANPR."""
+
+from app.schemas.anpr import AskRequest, AskResponse, DetectDecision, DetectResponse, ExitResponse
+
+__all__ = ["AskRequest", "AskResponse", "DetectDecision", "DetectResponse", "ExitResponse"]

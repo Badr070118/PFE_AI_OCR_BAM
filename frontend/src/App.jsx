@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import "./app-shell.css";
 import OcrPage from "./pages/OcrPage";
 import MlpdrPage from "./pages/MlpdrPage";
+import SmartParkingPage from "./pages/SmartParkingPage";
 
 function usePathname() {
   const [pathname, setPathname] = useState(window.location.pathname);
@@ -88,9 +89,12 @@ function ShellNav({ pathname }) {
     { key: "project", label: "Projet", path: "/project" },
     { key: "ocr", label: "OCR Documents", path: "/ocr" },
     { key: "mlpdr", label: "MLPDR Plaques", path: "/mlpdr" },
+    { key: "parking", label: "Smart Parking", path: "/anpr" },
   ];
 
-  const activeKey = pathname.startsWith("/mlpdr") || pathname.startsWith("/anpr")
+  const activeKey = pathname.startsWith("/anpr")
+    ? "parking"
+    : pathname.startsWith("/mlpdr")
     ? "mlpdr"
     : pathname.startsWith("/ocr")
     ? "ocr"
@@ -183,6 +187,7 @@ function HomeLanding() {
         <div className="inst-quick-grid">
           <QuickAccessTile title="OCR Documents" description="Upload, JSON, Llama, chat document." onClick={() => navigate("/ocr")} />
           <QuickAccessTile title="MLPDR Plaques" description="Detection plaque et artefacts images." onClick={() => navigate("/mlpdr")} />
+          <QuickAccessTile title="Smart Parking" description="Portail intelligent, logs et analytics." onClick={() => navigate("/anpr")} />
           <QuickAccessTile title="Page Projet" description="Architecture, workflow et acces modules." onClick={() => navigate("/project")} />
           <QuickAccessTile title="Sante OCR" description="Etat de service OCR via /health/ocr." onClick={() => window.open("/health/ocr", "_blank")} />
           <QuickAccessTile title="Sante MLPDR" description="Etat de service plaques via /health/mlpdr." onClick={() => window.open("/health/mlpdr", "_blank")} />
@@ -304,10 +309,7 @@ function RouteView({ pathname }) {
   }
 
   if (pathname.startsWith("/ocr")) return <OcrPage />;
-  if (pathname.startsWith("/anpr")) {
-    navigate("/mlpdr", { replace: true });
-    return null;
-  }
+  if (pathname.startsWith("/anpr")) return <SmartParkingPage />;
   if (pathname.startsWith("/mlpdr")) return <MlpdrPage />;
 
   return (

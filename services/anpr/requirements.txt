@@ -11,3 +11,8 @@ sqlalchemy
 psycopg[binary]
 pydantic
 pydantic-settings
+langchain
+langchain-openai
+langchain-community
+openai
+pymysql
