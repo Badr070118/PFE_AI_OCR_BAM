@@ -88,14 +88,11 @@ function ShellNav({ pathname }) {
     { key: "home", label: "Accueil", path: "/" },
     { key: "project", label: "Projet", path: "/project" },
     { key: "ocr", label: "OCR Documents", path: "/ocr" },
-    { key: "mlpdr", label: "MLPDR Plaques", path: "/mlpdr" },
     { key: "parking", label: "Smart Parking", path: "/anpr" },
   ];
 
   const activeKey = pathname.startsWith("/anpr")
     ? "parking"
-    : pathname.startsWith("/mlpdr")
-    ? "mlpdr"
     : pathname.startsWith("/ocr")
     ? "ocr"
     : pathname.startsWith("/project")
@@ -186,7 +183,6 @@ function HomeLanding() {
         </div>
         <div className="inst-quick-grid">
           <QuickAccessTile title="OCR Documents" description="Upload, JSON, Llama, chat document." onClick={() => navigate("/ocr")} />
-          <QuickAccessTile title="MLPDR Plaques" description="Detection plaque et artefacts images." onClick={() => navigate("/mlpdr")} />
           <QuickAccessTile title="Smart Parking" description="Portail intelligent, logs et analytics." onClick={() => navigate("/anpr")} />
           <QuickAccessTile title="Page Projet" description="Architecture, workflow et acces modules." onClick={() => navigate("/project")} />
           <QuickAccessTile title="Sante OCR" description="Etat de service OCR via /health/ocr." onClick={() => window.open("/health/ocr", "_blank")} />
@@ -220,8 +216,8 @@ function ProjectLanding() {
                 <button type="button" className="btn primary" onClick={() => navigate("/ocr")}>
                   Ouvrir OCR Documents
                 </button>
-                <button type="button" className="btn secondary" onClick={() => navigate("/mlpdr")}>
-                  Ouvrir MLPDR Plaques
+                <button type="button" className="btn secondary" onClick={() => navigate("/anpr")}>
+                  Ouvrir Smart Parking
                 </button>
                 <button type="button" className="btn ghost" onClick={() => navigate("/")}>
                   Retour accueil
@@ -251,8 +247,8 @@ function ProjectLanding() {
                 <button type="button" className="btn primary" onClick={() => navigate("/ocr")}>
                   Ouvrir OCR Documents
                 </button>
-                <button type="button" className="btn secondary" onClick={() => navigate("/mlpdr")}>
-                  Ouvrir MLPDR Plaques
+                <button type="button" className="btn secondary" onClick={() => navigate("/anpr")}>
+                  Ouvrir Smart Parking
                 </button>
               </div>
             </div>
@@ -278,11 +274,11 @@ function ProjectLanding() {
             </button>
           </article>
           <article className="inst-module-card">
-            <span className="inst-pill inst-pill-primary">MLPDR</span>
-            <h3>MLPDR Plaques</h3>
-            <p>Detection/lecture de plaques, modes OCR (trained/tesseract) et visualisation des artefacts.</p>
-            <button type="button" className="btn primary" onClick={() => navigate("/mlpdr")}>
-              Aller a MLPDR
+            <span className="inst-pill inst-pill-primary">Parking</span>
+            <h3>Smart Parking</h3>
+            <p>Simulation portail intelligent, detection plaque et suivi des acces.</p>
+            <button type="button" className="btn primary" onClick={() => navigate("/anpr")}>
+              Aller a Smart Parking
             </button>
           </article>
         </div>
@@ -310,7 +306,6 @@ function RouteView({ pathname }) {
 
   if (pathname.startsWith("/ocr")) return <OcrPage />;
   if (pathname.startsWith("/anpr")) return <SmartParkingPage />;
-  if (pathname.startsWith("/mlpdr")) return <MlpdrPage />;
 
   return (
     <div className="inst-page">
