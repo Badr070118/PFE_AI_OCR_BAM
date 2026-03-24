@@ -35,3 +35,30 @@ class DocumentAskResponse(BaseModel):
     fields_used: list[str] = Field(default_factory=list)
     evidence: list[str] = Field(default_factory=list)
     confidence: float
+
+
+class BatchItemResult(BaseModel):
+    filename: str
+    status: str
+    document_type: Optional[str] = None
+    db_id: Optional[int] = None
+    error: Optional[str] = None
+
+
+class BatchSummary(BaseModel):
+    batch_id: int
+    total_files: int
+    success_count: int
+    failed_count: int
+    status: str
+    created_at: datetime
+    results: list[BatchItemResult] = Field(default_factory=list)
+
+
+class BatchHistoryItem(BaseModel):
+    batch_id: int
+    total_files: int
+    success_count: int
+    failed_count: int
+    status: str
+    created_at: datetime

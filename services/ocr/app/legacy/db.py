@@ -58,6 +58,18 @@ class Document(Base):
     date_uploaded = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class OcrBatch(Base):
+    __tablename__ = "ocr_batches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    total_files = Column(Integer, nullable=False)
+    success_count = Column(Integer, nullable=False)
+    failed_count = Column(Integer, nullable=False)
+    status = Column(String(32), nullable=False, server_default="completed")
+    results = Column(JSONB, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 def create_db_and_tables() -> None:
     # Create the documents table if it does not exist.
     with engine.begin() as connection:
@@ -89,6 +101,36 @@ def save_document(
     db.commit()
     db.refresh(document)
     return document
+
+
+def save_batch(
+    db: Session,
+    *,
+    total_files: int,
+    success_count: int,
+    failed_count: int,
+    status: str,
+    results: list[dict],
+) -> OcrBatch:
+    batch = OcrBatch(
+        total_files=total_files,
+        success_count=success_count,
+        failed_count=failed_count,
+        status=status,
+        results=results,
+    )
+    db.add(batch)
+    db.commit()
+    db.refresh(batch)
+    return batch
+
+
+def list_batches(db: Session, *, limit: int = 20) -> list[OcrBatch]:
+    return db.query(OcrBatch).order_by(OcrBatch.created_at.desc()).limit(limit).all()
+
+
+def get_batch(db: Session, batch_id: int) -> OcrBatch | None:
+    return db.query(OcrBatch).filter(OcrBatch.id == batch_id).first()
 
 
 def update_llama_output(

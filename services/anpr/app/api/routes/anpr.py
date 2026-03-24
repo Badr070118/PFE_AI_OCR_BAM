@@ -15,6 +15,8 @@ from app.schemas.anpr import AskRequest, AskResponse, DetectDecision, DetectResp
 
 router = APIRouter(tags=["anpr"])
 
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov"}
+
 
 def _safe_child(base: Path, filename: str) -> Path:
     if Path(filename).name != filename:
@@ -31,7 +33,7 @@ def _build_artifact_urls(artifacts: dict) -> dict:
     for key, value in artifacts.items():
         if not value:
             output[key] = None
-        elif key == "input":
+        elif key in {"input", "video"}:
             output[key] = f"{prefix}/received/{value}"
         else:
             output[key] = f"{prefix}/artifacts/{value}"
@@ -52,6 +54,27 @@ async def _persist_upload(image: UploadFile) -> Path:
     return image_path
 
 
+def _persist_video_upload(video: UploadFile) -> Path:
+    if not video.filename:
+        raise HTTPException(status_code=400, detail="Invalid video file")
+    ext = Path(video.filename).suffix.lower()
+    is_video_type = bool(video.content_type and video.content_type.startswith("video/"))
+    if ext not in ALLOWED_VIDEO_EXTENSIONS and not is_video_type:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported video format. Supported: .mp4, .avi, .mov",
+        )
+    if not ext:
+        ext = ".mp4"
+    filename = f"video_{datetime.now().strftime('%Y_%m_%d-%H_%M_%S_%f')}{ext}"
+    video_path = RECEIVED_DIR / filename
+    with video_path.open("wb") as handle:
+        shutil.copyfileobj(video.file, handle)
+    if video_path.stat().st_size == 0:
+        raise HTTPException(status_code=400, detail="Empty video file")
+    return video_path
+
+
 def _persist_stream_path(image_path: str) -> Path:
     candidate = Path(image_path)
     if not candidate.is_absolute():
@@ -70,28 +93,47 @@ def _persist_stream_path(image_path: str) -> Path:
 @router.post("/anpr/detect", response_model=DetectResponse)
 async def detect_plate(
     image: UploadFile | None = File(default=None),
+    video: UploadFile | None = File(default=None),
     image_path: str | None = Form(default=None),
     ocr_mode: str = Form(default="trained"),
 ) -> DetectResponse:
     if ocr_mode not in {"trained", "tesseract"}:
         raise HTTPException(status_code=400, detail="Invalid ocr_mode. Use 'trained' or 'tesseract'.")
-    if not image and not image_path:
-        raise HTTPException(status_code=400, detail="Provide image file or image_path.")
+    if image and video:
+        raise HTTPException(status_code=400, detail="Provide either image or video, not both.")
+    if video and image_path:
+        raise HTTPException(status_code=400, detail="Provide either video or image_path, not both.")
+    if not image and not image_path and not video:
+        raise HTTPException(status_code=400, detail="Provide image, video, or image_path.")
 
-    if image:
-        saved_path = await _persist_upload(image)
+    media_type = "image"
+    if video:
+        media_type = "video"
+        saved_video = _persist_video_upload(video)
+        try:
+            result = get_engine().process_video(saved_video, ocr_mode=ocr_mode)
+        except RuntimeError as exc:
+            detail = str(exc)
+            status_code = 400 if "video" in detail.lower() or "frame" in detail.lower() else 500
+            raise HTTPException(status_code=status_code, detail=detail) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"ANPR video processing failed: {exc}") from exc
     else:
-        saved_path = _persist_stream_path(image_path or "")
+        if image:
+            saved_path = await _persist_upload(image)
+        else:
+            saved_path = _persist_stream_path(image_path or "")
 
-    try:
-        result = get_engine().process_image(saved_path, ocr_mode=ocr_mode)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"ANPR processing failed: {exc}") from exc
+        try:
+            result = get_engine().process_image(saved_path, ocr_mode=ocr_mode)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"ANPR processing failed: {exc}") from exc
 
     detected_at = datetime.now()
-    image_ref = f"received/{saved_path.name}"
+    input_name = result["artifacts"].get("input")
+    image_ref = f"received/{input_name}" if input_name else None
 
     decision = evaluate_plate(result["plate_text"], image_ref, detected_at)
 
@@ -99,6 +141,7 @@ async def detect_plate(
         plate_text=result["plate_text"],
         has_plate=result["has_plate"],
         ocr_mode=ocr_mode,
+        media_type=media_type,
         decision=DetectDecision(
             status=decision.status,
             action=decision.action,

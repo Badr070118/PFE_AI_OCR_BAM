@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatPlateDisplay } from "../utils/plate";
 import "./smart-parking.css";
 
 const rawApiBase = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
@@ -97,6 +98,13 @@ const buildQuickSpecs = () => {
 
 const QUICK_SPECS = buildQuickSpecs();
 
+const isVideoFile = (value) => {
+  if (!value) return false;
+  if (value.type && value.type.startsWith("video/")) return true;
+  const ext = value.name.split(".").pop()?.toLowerCase();
+  return ["mp4", "avi", "mov"].includes(ext || "");
+};
+
 export default function SmartParkingPage() {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -158,14 +166,15 @@ export default function SmartParkingPage() {
   const submit = async (event) => {
     event.preventDefault();
     if (!file) {
-      setError("Select an image first.");
+      setError("Select an image or video first.");
       return;
     }
     setLoading(true);
     resetTransient();
     try {
+      const isVideo = isVideoFile(file);
       const body = new FormData();
-      body.append("image", file);
+      body.append(isVideo ? "video" : "image", file);
       body.append("ocr_mode", ocrMode);
       const res = await fetch(`${API_PREFIX}/detect`, {
         method: "POST",
@@ -233,7 +242,12 @@ export default function SmartParkingPage() {
               resolved[col.label] = numericValue ?? "-";
             }
           } else if (row[col.key] !== undefined) {
-            resolved[col.label] = col.format ? col.format(row[col.key]) : row[col.key];
+            const value = row[col.key];
+            if (col.key === "plate_number") {
+              resolved[col.label] = formatPlateDisplay(value);
+            } else {
+              resolved[col.label] = col.format ? col.format(value) : value;
+            }
           } else {
             resolved[col.label] = "-";
           }
@@ -282,7 +296,11 @@ export default function SmartParkingPage() {
         <div className="parking-chat-answer">
           <div className="parking-chat-answer-lines">
             {rows.map((row, idx) => {
-              const values = LINE_KEYS.map((key) => row[key]).filter((value) => value !== undefined && value !== null);
+              const values = LINE_KEYS.map((key) => {
+                const value = row[key];
+                if (key === "plate_number") return formatPlateDisplay(value);
+                return value;
+              }).filter((value) => value !== undefined && value !== null);
               const line = values.length > 0 ? values.join(" | ") : JSON.stringify(row);
               return (
                 <div key={`${idx}-${line}`} className="parking-chat-answer-item">
@@ -308,7 +326,7 @@ export default function SmartParkingPage() {
             </div>
             {records.map((record, idx) => (
               <div key={`${record.plate}-${idx}`} className="parking-chat-table-row">
-                <span>{record.plate}</span>
+                <span>{formatPlateDisplay(record.plate)}</span>
                 <span className={`badge status-${record.status.toLowerCase()}`}>{record.status}</span>
                 <span>{record.time}</span>
               </div>
@@ -390,7 +408,7 @@ export default function SmartParkingPage() {
         <section className="panel parking-section detection">
           <div className="panel-header">
             <h2>Detection Camera</h2>
-            <p>Upload d&apos;image vehicule pour detection plaque et decision portail.</p>
+            <p>Upload d&apos;image ou video vehicule pour detection plaque et decision portail.</p>
           </div>
 
           <form onSubmit={submit}>
@@ -410,8 +428,12 @@ export default function SmartParkingPage() {
             </div>
 
             <label className="file-input file-input-drop">
-              <input type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] || null)} />
-              <span>{file ? file.name : "Drop image here or click to browse"}</span>
+              <input
+                type="file"
+                accept="image/*,video/*"
+                onChange={(event) => setFile(event.target.files?.[0] || null)}
+              />
+              <span>{file ? file.name : "Drop image or video here or click to browse"}</span>
             </label>
 
             <button className="btn primary" type="submit" disabled={loading}>
@@ -424,7 +446,18 @@ export default function SmartParkingPage() {
           {previewUrl && (
             <div className="mlpdr-preview-box">
               <p className="state">Input preview</p>
-              <img src={previewUrl} alt="Selected vehicle" />
+              {isVideoFile(file) ? (
+                <video src={previewUrl} controls />
+              ) : (
+                <img src={previewUrl} alt="Selected vehicle" />
+              )}
+            </div>
+          )}
+
+          {result?.artifacts?.input && isVideoFile(file) && (
+            <div className="mlpdr-preview-box">
+              <p className="state">Best detection frame</p>
+              <img src={result.artifacts.input} alt="Best detection frame" />
             </div>
           )}
         </section>
@@ -454,7 +487,7 @@ export default function SmartParkingPage() {
             <div className="parking-live">
               <div>
                 <span className="state">Plate detected</span>
-                <p className="parking-plate">{result.plate_text || "-"}</p>
+                <p className="parking-plate">{formatPlateDisplay(result.plate_text || "-")}</p>
               </div>
               <div className="parking-live-grid">
                 <div>
@@ -545,7 +578,7 @@ export default function SmartParkingPage() {
               <tbody>
                 {logs.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.plate_number}</td>
+                    <td>{formatPlateDisplay(item.plate_number)}</td>
                     <td>{item.status}</td>
                     <td>{formatTimestamp(item.entry_time)}</td>
                     <td>{formatTimestamp(item.exit_time)}</td>
@@ -567,7 +600,7 @@ export default function SmartParkingPage() {
               {alerts.blacklisted.length === 0 && <p className="state">No alerts.</p>}
               {alerts.blacklisted.map((item) => (
                 <div key={`blk-${item.id}`} className="parking-alert-item">
-                  <strong>{item.plate_number}</strong>
+                  <strong>{formatPlateDisplay(item.plate_number)}</strong>
                   <span>{formatTimestamp(item.entry_time)}</span>
                 </div>
               ))}
@@ -577,7 +610,7 @@ export default function SmartParkingPage() {
               {alerts.unknown.length === 0 && <p className="state">No unknown plates.</p>}
               {alerts.unknown.map((item) => (
                 <div key={`unk-${item.id}`} className="parking-alert-item">
-                  <strong>{item.plate_number}</strong>
+                  <strong>{formatPlateDisplay(item.plate_number)}</strong>
                   <span>{formatTimestamp(item.detected_at)}</span>
                 </div>
               ))}

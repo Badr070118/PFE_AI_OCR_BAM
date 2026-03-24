@@ -22,6 +22,33 @@ export async function uploadDocument(file, options = {}) {
   return response.data;
 }
 
+export async function uploadBatch(files, options = {}) {
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append("files", file);
+  });
+  const forcedDocType = (options.forcedDocType || "").trim();
+  if (forcedDocType) {
+    formData.append("forced_doc_type", forcedDocType);
+  }
+
+  const response = await api.post("/batch/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 300000,
+  });
+  return response.data;
+}
+
+export async function fetchBatchHistory(limit = 10) {
+  const response = await api.get("/batch", { params: { limit } });
+  return response.data;
+}
+
+export async function fetchBatchDetail(batchId) {
+  const response = await api.get(`/batch/${batchId}`);
+  return response.data;
+}
+
 export async function fetchDocuments() {
   const response = await api.get("/documents");
   return response.data;

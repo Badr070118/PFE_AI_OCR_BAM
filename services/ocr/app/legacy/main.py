@@ -26,6 +26,9 @@ from app.legacy.db import (
     Document,
     create_db_and_tables,
     get_db,
+    get_batch,
+    list_batches,
+    save_batch,
     save_document,
     update_document_data,
     update_llama_output,
@@ -44,7 +47,13 @@ from app.legacy.ocr import (
 )
 from app.legacy.qa_service import ask_document_question
 from app.legacy.review.router import review_router
-from app.legacy.schemas import DocumentAskRequest, DocumentAskResponse, DocumentOut
+from app.legacy.schemas import (
+    BatchHistoryItem,
+    BatchSummary,
+    DocumentAskRequest,
+    DocumentAskResponse,
+    DocumentOut,
+)
 
 FASTAPI_ROOT_PATH = (os.getenv("FASTAPI_ROOT_PATH") or "").strip()
 logger = logging.getLogger(__name__)
@@ -128,6 +137,94 @@ def _normalize_doc_type_override(value: str | None) -> str | None:
     if normalized in {"invoice", "bank_statement", "payment_receipt", "wire_transfer"}:
         return normalized
     return None
+
+
+def _persist_upload(file: UploadFile) -> tuple[str, Path]:
+    if not _is_allowed_upload(file):
+        raise ValueError("Unsupported file type.")
+
+    original_name = Path(file.filename or "upload").name
+    extension = Path(original_name).suffix.lower()
+    safe_name = f"{uuid4().hex}{extension}"
+    destination = UPLOADS_DIR / safe_name
+
+    try:
+        file.file.seek(0)
+    except Exception:
+        pass
+
+    with destination.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return original_name, destination
+
+
+def process_document(
+    *,
+    file: UploadFile,
+    forced_doc_type: str | None,
+    db: Session,
+) -> Document:
+    original_name, destination = _persist_upload(file)
+
+    structured_extraction, pdf_kind_detection, structured_error = _run_structured_extraction(destination)
+
+    extracted_text = extract_text_with_glm_ocr(str(destination)) or ""
+    if not extracted_text and structured_extraction:
+        extracted_text = structured_extraction.get("raw_text", "") or ""
+
+    detection_source_text = structured_extraction.get("raw_text", "") if structured_extraction else extracted_text
+    detection = detect_document_type(detection_source_text or extracted_text, None)
+
+    selected_doc_type = detection.get("doc_type", "unknown")
+    override_type = _normalize_doc_type_override(forced_doc_type)
+    if override_type is not None:
+        selected_doc_type = override_type
+        detection = {
+            "doc_type": override_type,
+            "confidence": 1.0,
+            "reasons": (detection.get("reasons") or []) + [f"type force par l'utilisateur: {override_type}"],
+        }
+
+    extractor_name = choose_extractor_name(str(selected_doc_type))
+    structured_data = _extract_structured_data(
+        doc_type=str(selected_doc_type),
+        extractor_name=extractor_name,
+        file_path=destination,
+        ocr_text=detection_source_text or extracted_text,
+    )
+    template_json, template_meta = _extract_template_payload(
+        doc_type=str(selected_doc_type),
+        raw_text=detection_source_text or extracted_text,
+        lines=(
+            structured_extraction.get("lines")
+            if isinstance(structured_extraction, dict)
+            and isinstance(structured_extraction.get("lines"), list)
+            else None
+        ),
+    )
+
+    structured_pages_html, structured_html = _render_structured_payload(
+        structured_extraction,
+        fallback_text=detection_source_text or extracted_text,
+    )
+
+    document = save_document(
+        db, file_name=original_name, data=structured_data, raw_text=extracted_text
+    )
+    setattr(document, "doc_type_detection", detection)
+    setattr(document, "structured_extraction", structured_extraction)
+    setattr(
+        document,
+        "tables_html",
+        tables_to_html_payload(structured_extraction) if structured_extraction else [],
+    )
+    setattr(document, "pdf_kind_detection", pdf_kind_detection)
+    setattr(document, "structured_extraction_error", structured_error)
+    setattr(document, "structured_pages_html", structured_pages_html)
+    setattr(document, "structured_html", structured_html)
+    setattr(document, "extracted_json_template", template_json)
+    setattr(document, "template_extraction_meta", template_meta)
+    return document
 
 
 def _extract_structured_data(
@@ -256,83 +353,114 @@ async def upload_file(
     forced_doc_type: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ) -> Document:
-    if not _is_allowed_upload(file):
-        raise HTTPException(status_code=400, detail="Unsupported file type.")
-
-    original_name = Path(file.filename or "upload").name
-    extension = Path(original_name).suffix.lower()
-    safe_name = f"{uuid4().hex}{extension}"
-    destination = UPLOADS_DIR / safe_name
-
-    with destination.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    structured_extraction, pdf_kind_detection, structured_error = _run_structured_extraction(destination)
-
     try:
-        extracted_text = extract_text_with_glm_ocr(str(destination))
-        extracted_text = extracted_text or ""
-        if not extracted_text and structured_extraction:
-            extracted_text = structured_extraction.get("raw_text", "") or ""
-
-        detection_source_text = (
-            structured_extraction.get("raw_text", "") if structured_extraction else extracted_text
-        )
-        detection = detect_document_type(detection_source_text or extracted_text, None)
-
-        selected_doc_type = detection.get("doc_type", "unknown")
-        override_type = _normalize_doc_type_override(forced_doc_type)
-        if override_type is not None:
-            selected_doc_type = override_type
-            detection = {
-                "doc_type": override_type,
-                "confidence": 1.0,
-                "reasons": (detection.get("reasons") or [])
-                + [f"type force par l'utilisateur: {override_type}"],
-            }
-
-        extractor_name = choose_extractor_name(str(selected_doc_type))
-        structured_data = _extract_structured_data(
-            doc_type=str(selected_doc_type),
-            extractor_name=extractor_name,
-            file_path=destination,
-            ocr_text=detection_source_text or extracted_text,
-        )
-        template_json, template_meta = _extract_template_payload(
-            doc_type=str(selected_doc_type),
-            raw_text=detection_source_text or extracted_text,
-            lines=(
-                structured_extraction.get("lines")
-                if isinstance(structured_extraction, dict)
-                and isinstance(structured_extraction.get("lines"), list)
-                else None
-            ),
-        )
-
-        structured_pages_html, structured_html = _render_structured_payload(
-            structured_extraction,
-            fallback_text=detection_source_text or extracted_text,
-        )
+        return process_document(file=file, forced_doc_type=forced_doc_type, db=db)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    document = save_document(
-        db, file_name=original_name, data=structured_data, raw_text=extracted_text
+
+@app.post("/batch/upload", response_model=BatchSummary, tags=["documents"])
+async def upload_batch(
+    files: list[UploadFile] = File(...),
+    forced_doc_type: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+) -> BatchSummary:
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided.")
+
+    results: list[dict[str, Any]] = []
+    success_count = 0
+
+    for file in files:
+        filename = Path(file.filename or "upload").name
+        try:
+            document = process_document(file=file, forced_doc_type=forced_doc_type, db=db)
+            detection = getattr(document, "doc_type_detection", {}) or {}
+            doc_type = detection.get("doc_type") if isinstance(detection, dict) else None
+            results.append(
+                {
+                    "filename": filename,
+                    "status": "success",
+                    "document_type": doc_type,
+                    "db_id": document.id,
+                }
+            )
+            success_count += 1
+        except ValueError as exc:
+            db.rollback()
+            results.append(
+                {
+                    "filename": filename,
+                    "status": "failed",
+                    "error": str(exc),
+                }
+            )
+        except Exception as exc:
+            db.rollback()
+            results.append(
+                {
+                    "filename": filename,
+                    "status": "failed",
+                    "error": str(exc),
+                }
+            )
+
+    total_files = len(files)
+    failed_count = total_files - success_count
+    status = "completed" if failed_count == 0 else "completed_with_errors"
+
+    batch = save_batch(
+        db,
+        total_files=total_files,
+        success_count=success_count,
+        failed_count=failed_count,
+        status=status,
+        results=results,
     )
-    setattr(document, "doc_type_detection", detection)
-    setattr(document, "structured_extraction", structured_extraction)
-    setattr(
-        document,
-        "tables_html",
-        tables_to_html_payload(structured_extraction) if structured_extraction else [],
+
+    return BatchSummary(
+        batch_id=batch.id,
+        total_files=batch.total_files,
+        success_count=batch.success_count,
+        failed_count=batch.failed_count,
+        status=batch.status,
+        created_at=batch.created_at,
+        results=results,
     )
-    setattr(document, "pdf_kind_detection", pdf_kind_detection)
-    setattr(document, "structured_extraction_error", structured_error)
-    setattr(document, "structured_pages_html", structured_pages_html)
-    setattr(document, "structured_html", structured_html)
-    setattr(document, "extracted_json_template", template_json)
-    setattr(document, "template_extraction_meta", template_meta)
-    return document
+
+
+@app.get("/batch", response_model=list[BatchHistoryItem], tags=["documents"])
+def list_batch_history(limit: int = 20, db: Session = Depends(get_db)) -> list[BatchHistoryItem]:
+    batches = list_batches(db, limit=limit)
+    return [
+        BatchHistoryItem(
+            batch_id=batch.id,
+            total_files=batch.total_files,
+            success_count=batch.success_count,
+            failed_count=batch.failed_count,
+            status=batch.status,
+            created_at=batch.created_at,
+        )
+        for batch in batches
+    ]
+
+
+@app.get("/batch/{batch_id}", response_model=BatchSummary, tags=["documents"])
+def get_batch_detail(batch_id: int, db: Session = Depends(get_db)) -> BatchSummary:
+    batch = get_batch(db, batch_id)
+    if batch is None:
+        raise HTTPException(status_code=404, detail="Batch not found.")
+    return BatchSummary(
+        batch_id=batch.id,
+        total_files=batch.total_files,
+        success_count=batch.success_count,
+        failed_count=batch.failed_count,
+        status=batch.status,
+        created_at=batch.created_at,
+        results=batch.results or [],
+    )
 
 
 @app.post("/ocr", tags=["ocr"])

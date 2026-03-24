@@ -1149,7 +1149,8 @@ textarea:focus-visible {
   margin-top: 12px;
 }
 
-.mlpdr-preview-box img {
+.mlpdr-preview-box img,
+.mlpdr-preview-box video {
   width: 100%;
   border-radius: 12px;
   border: 1px solid rgba(var(--border-rgb), 1);
@@ -1246,6 +1247,117 @@ textarea:focus-visible {
   justify-content: center;
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+/* OCR batch UI */
+.batch-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.batch-summary div {
+  border: 1px solid rgba(var(--border-rgb), 1);
+  border-radius: 12px;
+  background: rgba(var(--surface-soft-rgb), 0.7);
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.batch-summary span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.batch-summary strong {
+  font-size: 1rem;
+  color: rgb(var(--primary-rgb));
+}
+
+.batch-table {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.batch-table-header,
+.batch-table-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.6fr 0.8fr 0.8fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.batch-table-header {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(15, 23, 42, 0.6);
+  padding: 0 0.2rem;
+}
+
+.batch-table-row {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.batch-history {
+  display: grid;
+  gap: 8px;
+}
+
+.batch-history-item {
+  border: 1px solid rgba(var(--border-rgb), 1);
+  border-radius: 12px;
+  background: rgba(var(--surface-rgb), 0.9);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.batch-history-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--primary-rgb), 0.25);
+  box-shadow: var(--shadow-soft);
+}
+
+.batch-history-item.active {
+  border-color: rgba(var(--primary-rgb), 0.35);
+  background: rgba(var(--primary-rgb), 0.06);
+}
+
+.batch-history-item span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.batch-history-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.status-success {
+  background: rgba(16, 185, 129, 0.14);
+  color: #0f5132;
+}
+
+.status-failed {
+  background: rgba(239, 68, 68, 0.14);
+  color: #7f1d1d;
 }
 
 /* Responsive */

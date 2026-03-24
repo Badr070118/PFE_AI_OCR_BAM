@@ -20,6 +20,7 @@ class DetectResponse(BaseModel):
     plate_text: str
     has_plate: bool
     ocr_mode: str
+    media_type: str = Field(default="image")
     decision: DetectDecision
     artifacts: dict[str, str | None]
     log_id: int

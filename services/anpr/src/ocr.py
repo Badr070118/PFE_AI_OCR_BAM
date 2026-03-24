@@ -105,34 +105,35 @@ class PlateReader:
             cv2.putText(img, f"{confidence}%", (x, y - 6), font, 1, color, 2)
             characters.append((label, x))
         characters.sort(key=lambda x: x[1])
-        plate = "".join(label for label, _ in characters)
-        chg = 0
-        ar = 0
-        for i in range(len(plate)):
-            if plate[i] in ["b", "h", "d", "a"]:
-                if i > 0 and plate[i - 1] == "w":
-                    ar = i - 1
-                    chg = 2
-                elif i > 0 and plate[i - 1] == "c":
-                    ar = i - 1
-                    chg = 3
-                else:
-                    ar = i
-                    chg = 1
+        tokens = [label for label, _ in characters]
 
-        if chg == 1:
-            plate = plate[:ar] + " | " + str(self.arabic_chars(ord(plate[ar])), encoding="utf-8") + " | " + plate[ar + 1 :]
-        if chg == 2:
-            index = ""
-            for i in range(3):
-                index = index + plate[ar + i]
-            plate = plate[:ar] + " | " + str(self.arabic_chars(index), encoding="utf-8") + " | " + plate[ar + 3 :]
-        if chg == 3:
-            index = ""
-            for i in range(2):
-                index = index + plate[ar + i]
-            plate = plate[:ar] + " | " + str(self.arabic_chars(index), encoding="utf-8") + " | " + plate[ar + 2 :]
+        arabic_token = None
+        arabic_index = None
+        preferred = {"waw", "ch", "a", "b", "d", "h", "w"}
+        for idx, token in enumerate(tokens):
+            if token in preferred:
+                arabic_token = token
+                arabic_index = idx
+                break
 
+        if arabic_token is None or arabic_index is None:
+            return img, "".join(tokens)
+
+        token_to_index = {
+            "a": ord("a"),
+            "b": ord("b"),
+            "d": ord("d"),
+            "h": ord("h"),
+            "w": ord("w"),
+            "waw": ord("w"),
+            "ch": ord("c") + ord("h"),
+        }
+        arabic_bytes = self.arabic_chars(token_to_index.get(arabic_token, 0))
+        arabic_char = str(arabic_bytes, encoding="utf-8") if arabic_bytes else ""
+
+        left = "".join(tokens[:arabic_index])
+        right = "".join(tokens[arabic_index + 1 :])
+        plate = f"{left} | {arabic_char} | {right}"
         return img, plate
 
     def arabic_chars(self, index):

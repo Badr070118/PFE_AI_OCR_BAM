@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatPlateDisplay } from "../utils/plate";
 
 const rawApiBase = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 const API_PREFIX = rawApiBase ? `${rawApiBase}/api/mlpdr` : "/api/mlpdr";
@@ -170,7 +171,7 @@ export default function MlpdrPage() {
 
               <div className="mlpdr-plate-output">
                 <p className="state">Recognized plate</p>
-                <p className="mlpdr-plate-text">{response.plate_text || "-"}</p>
+                <p className="mlpdr-plate-text">{formatPlateDisplay(response.plate_text || "-")}</p>
               </div>
 
               <pre className="result">{JSON.stringify(response, null, 2)}</pre>

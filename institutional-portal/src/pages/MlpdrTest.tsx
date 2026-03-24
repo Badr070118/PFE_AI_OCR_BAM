@@ -67,6 +67,66 @@ function normalizeArtifactUrl(path: string | null, apiBase: string) {
   return `${apiBase}/${path}`;
 }
 
+const ARABIC_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+const ARABIC_TOKEN_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+/;
+const LRI = "\u2066";
+const RLI = "\u2067";
+const PDI = "\u2069";
+
+const isolate = (text: string, dir: "ltr" | "rtl") => {
+  if (!text) return "";
+  return `${dir === "rtl" ? RLI : LRI}${text}${PDI}`;
+};
+
+function formatPlateDisplay(value: string | null | undefined) {
+  if (!value) return value ?? "";
+  const raw = String(value).trim();
+  if (!raw) return raw;
+
+  const tokens = raw
+    .split(/[-|\s]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  let arabicToken = tokens.find((part) => ARABIC_REGEX.test(part));
+  if (!arabicToken) {
+    arabicToken = tokens.find((part) => !/^\d+$/.test(part));
+  }
+  if (!arabicToken) {
+    arabicToken = raw.match(ARABIC_TOKEN_REGEX)?.[0] ?? raw.match(/[^\d\s\-|]+/)?.[0] ?? "";
+  }
+  if (!arabicToken) return raw;
+
+  const remaining = [...tokens];
+  const index = remaining.findIndex((part) => part === arabicToken);
+  if (index >= 0) remaining.splice(index, 1);
+
+  let numeric = remaining.filter((part) => /^\d+$/.test(part));
+  if (numeric.length < 2) {
+    const extracted = raw.match(/\d+/g) || [];
+    if (extracted.length >= 1) numeric = extracted;
+  }
+
+  let left = "";
+  let right = "";
+  if (numeric.length >= 2) {
+    left = numeric[0];
+    right = numeric[numeric.length - 1] || "";
+    if (right === left && numeric.length > 1) right = numeric[1] || "";
+  } else if (numeric.length === 1) {
+    left = numeric[0];
+    right = remaining.find((part) => part !== left) || "";
+  } else {
+    left = remaining[0] || "";
+    right = remaining.slice(1).join("");
+  }
+
+  if (left && right) return `${isolate(left, "ltr")} - ${isolate(arabicToken, "rtl")} - ${isolate(right, "ltr")}`;
+  if (left) return `${isolate(left, "ltr")} - ${isolate(arabicToken, "rtl")}`;
+  if (right) return `${isolate(arabicToken, "rtl")} - ${isolate(right, "ltr")}`;
+  return raw;
+}
+
 export default function MlpdrTest() {
   const fileInputId = useId();
   const apiBase = resolveApiBase("/api/mlpdr");
@@ -284,7 +344,9 @@ export default function MlpdrTest() {
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-border bg-surfaceSoft p-4">
                 <div className="text-xs uppercase tracking-[0.08em] text-muted">Plate text</div>
-                <div className="mt-2 text-xl font-semibold text-primary">{result?.plate_text || "-"}</div>
+                <div className="mt-2 text-xl font-semibold text-primary">
+                  {formatPlateDisplay(result?.plate_text || "-")}
+                </div>
               </div>
               <div className="rounded-xl border border-border bg-surfaceSoft p-4">
                 <div className="text-xs uppercase tracking-[0.08em] text-muted">Mode OCR</div>
