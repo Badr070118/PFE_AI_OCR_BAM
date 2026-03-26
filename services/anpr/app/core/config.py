@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     anpr_llm_timeout_seconds: float = Field(default=3.0, alias="ANPR_LLM_TIMEOUT_SECONDS")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     ollama_base_url: str | None = Field(default=None, alias="OLLAMA_BASE_URL")
+    anpr_reports_dir: str = Field(default="storage/reports/anpr", alias="ANPR_REPORTS_DIR")
+    attendance_start_time: str = Field(default="09:00", alias="ATTENDANCE_START_TIME")
+    attendance_late_minutes: int = Field(default=15, alias="ATTENDANCE_LATE_MINUTES")
+    attendance_dedup_minutes: int = Field(default=5, alias="ATTENDANCE_DEDUP_MINUTES")
 
     @property
     def cors_origins(self) -> list[str]:

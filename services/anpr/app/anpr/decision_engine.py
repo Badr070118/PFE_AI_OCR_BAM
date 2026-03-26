@@ -5,11 +5,12 @@ from datetime import datetime
 import re
 
 from app.anpr.database import (
-    get_vehicle,
+    find_vehicle_by_plate,
     insert_unknown_detection,
     log_detection,
     log_no_plate,
 )
+from app.anpr.plate_utils import normalize_plate
 
 
 @dataclass
@@ -22,11 +23,11 @@ class DecisionResult:
     reason: str | None
     log_id: int
     event: str
+    matched_plate: str | None
 
 
 def evaluate_plate(plate_text: str, image_path: str | None, detected_at: datetime) -> DecisionResult:
-    normalized = plate_text.strip()
-    normalized = normalized.replace(" | ", "-").replace("|", "-").replace(" ", "")
+    normalized = normalize_plate(plate_text.strip())
     arabic_range = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
     fallback = arabic_range.sub("?", normalized)
     if not normalized:
@@ -40,13 +41,14 @@ def evaluate_plate(plate_text: str, image_path: str | None, detected_at: datetim
             reason=None,
             log_id=log["log_id"],
             event=log["event"],
+            matched_plate=None,
         )
 
     lookup_plate = normalized
-    vehicle = get_vehicle(lookup_plate)
+    vehicle = find_vehicle_by_plate(lookup_plate)
     if not vehicle and fallback != normalized:
         lookup_plate = fallback
-        vehicle = get_vehicle(lookup_plate)
+        vehicle = find_vehicle_by_plate(lookup_plate)
     log_plate = normalized if arabic_range.search(normalized) else lookup_plate
     if vehicle and vehicle.get("status") == "AUTHORIZED":
         log = log_detection(log_plate, "AUTHORIZED", image_path, detected_at)
@@ -59,6 +61,7 @@ def evaluate_plate(plate_text: str, image_path: str | None, detected_at: datetim
             reason=None,
             log_id=log["log_id"],
             event=log["event"],
+            matched_plate=vehicle.get("plate_number"),
         )
 
     if vehicle and vehicle.get("status") == "BLACKLISTED":
@@ -72,6 +75,7 @@ def evaluate_plate(plate_text: str, image_path: str | None, detected_at: datetim
             reason="Suspicious vehicle",
             log_id=log["log_id"],
             event=log["event"],
+            matched_plate=vehicle.get("plate_number"),
         )
 
     insert_unknown_detection(normalized, image_path, detected_at)
@@ -85,4 +89,5 @@ def evaluate_plate(plate_text: str, image_path: str | None, detected_at: datetim
         reason=None,
         log_id=log["log_id"],
         event=log["event"],
+        matched_plate=None,
     )

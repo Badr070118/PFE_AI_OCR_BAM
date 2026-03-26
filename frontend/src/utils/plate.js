@@ -3,6 +3,7 @@ const ARABIC_TOKEN_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDF
 const LRI = "\u2066";
 const RLI = "\u2067";
 const PDI = "\u2069";
+const DEFAULT_ARABIC_LETTER = "\u0648";
 
 const isolate = (text, dir) => {
   if (!text) return "";
@@ -27,7 +28,14 @@ export function formatPlateDisplay(value) {
   if (!arabicToken) {
     arabicToken = raw.match(ARABIC_TOKEN_REGEX)?.[0] || raw.match(/[^\d\s\-|]+/)?.[0] || "";
   }
-  if (!arabicToken) return raw;
+  if (!arabicToken) {
+    const numericTokens = normalizedTokens.filter((part) => /^\d+$/.test(part));
+    if (numericTokens.length >= 2) {
+      arabicToken = DEFAULT_ARABIC_LETTER;
+    } else {
+      return raw;
+    }
+  }
 
   const remaining = [...normalizedTokens];
   const index = remaining.findIndex((part) => part === arabicToken);

@@ -11,6 +11,7 @@ sqlalchemy
 psycopg[binary]
 pydantic
 pydantic-settings
+reportlab==4.2.0
 langchain
 langchain-openai
 langchain-community

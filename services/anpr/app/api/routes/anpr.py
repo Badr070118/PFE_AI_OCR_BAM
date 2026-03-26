@@ -10,8 +10,16 @@ from PIL import Image, UnidentifiedImageError
 from app.anpr.decision_engine import evaluate_plate
 from app.anpr.engine import RECEIVED_DIR, STREAM_DIR, TMP_DIR, get_engine
 from app.anpr.rag_module import answer_question
-from app.anpr.database import close_parking_session, fetch_alerts, fetch_logs, stats_snapshot
-from app.schemas.anpr import AskRequest, AskResponse, DetectDecision, DetectResponse, ExitResponse
+from app.anpr.database import close_parking_session, fetch_alerts, fetch_logs, stats_snapshot, upsert_authorized_employee
+from app.schemas.anpr import (
+    AskRequest,
+    AskResponse,
+    AuthorizedEmployeeRequest,
+    AuthorizedEmployeeResponse,
+    DetectDecision,
+    DetectResponse,
+    ExitResponse,
+)
 
 router = APIRouter(tags=["anpr"])
 
@@ -138,7 +146,7 @@ async def detect_plate(
     decision = evaluate_plate(result["plate_text"], image_ref, detected_at)
 
     response = DetectResponse(
-        plate_text=result["plate_text"],
+        plate_text=decision.matched_plate or result["plate_text"],
         has_plate=result["has_plate"],
         ocr_mode=ocr_mode,
         media_type=media_type,
@@ -203,6 +211,25 @@ async def register_exit(
     if not result["closed"]:
         return ExitResponse(plate_text=plate, closed=False, log_id=None, message="No open parking session found.")
     return ExitResponse(plate_text=plate, closed=True, log_id=result["log_id"], message="Exit registered.")
+
+
+@router.post("/anpr/authorized", response_model=AuthorizedEmployeeResponse)
+def add_authorized_employee(payload: AuthorizedEmployeeRequest) -> AuthorizedEmployeeResponse:
+    result = upsert_authorized_employee(
+        full_name=payload.full_name,
+        department=payload.department,
+        plate_number=payload.plate_number,
+        is_authorized=payload.is_authorized,
+        employee_code=payload.employee_code,
+    )
+    return AuthorizedEmployeeResponse(
+        full_name=payload.full_name,
+        department=payload.department,
+        plate_number=payload.plate_number,
+        authorized=payload.is_authorized,
+        vehicle_id=result["vehicle_id"],
+        employee_id=result["employee_id"],
+    )
 
 
 @router.get("/anpr/logs")

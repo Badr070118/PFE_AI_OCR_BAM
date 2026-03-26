@@ -21,6 +21,16 @@ const QUICK_QUESTIONS = [
   "Qui arrive souvent en retard ?",
 ];
 
+const REPORT_TYPES = [
+  { value: "daily", label: "Quotidien" },
+  { value: "weekly", label: "Hebdomadaire" },
+  { value: "monthly", label: "Mensuel" },
+  { value: "yearly", label: "Annuel" },
+  { value: "custom", label: "Personnalise" },
+];
+
+const reportTypeLabel = (value) => REPORT_TYPES.find((item) => item.value === value)?.label || value;
+
 const STATUS_VALUES = ["AUTHORIZED", "BLACKLISTED", "UNKNOWN", "DENIED"];
 const LINE_KEYS = ["owner_name", "plate_number", "status", "entry_time", "exit_time", "detected_at", "vehicle_type"];
 
@@ -29,6 +39,34 @@ const formatTimestamp = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
+};
+
+const formatMinutes = (value) => {
+  if (value === null || value === undefined) return "-";
+  const total = Math.round(Number(value));
+  if (Number.isNaN(total)) return "-";
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+};
+
+const toDateInput = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+};
+
+const getIsoWeek = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { year: new Date().getFullYear(), week: 1 };
+  const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNumber = target.getUTCDay() || 7;
+  target.setUTCDate(target.getUTCDate() + 4 - dayNumber);
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((target - yearStart) / 86400000 + 1) / 7);
+  return { year: target.getUTCFullYear(), week };
 };
 
 const normalizeQuestion = (value) => {
@@ -106,6 +144,9 @@ const isVideoFile = (value) => {
 };
 
 export default function SmartParkingPage() {
+  const today = new Date();
+  const todayIso = toDateInput(today);
+  const todayWeek = getIsoWeek(today);
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [ocrMode, setOcrMode] = useState("trained");
@@ -118,6 +159,17 @@ export default function SmartParkingPage() {
   const [question, setQuestion] = useState("");
   const [chat, setChat] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
+  const [reportType, setReportType] = useState("daily");
+  const [reportDate, setReportDate] = useState(todayIso);
+  const [reportYear, setReportYear] = useState(todayWeek.year);
+  const [reportWeek, setReportWeek] = useState(todayWeek.week);
+  const [reportMonth, setReportMonth] = useState(today.getMonth() + 1);
+  const [reportStartDate, setReportStartDate] = useState(todayIso);
+  const [reportEndDate, setReportEndDate] = useState(todayIso);
+  const [reportPreview, setReportPreview] = useState(null);
+  const [reportHistory, setReportHistory] = useState([]);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState("");
 
   useEffect(() => {
     if (!file) {
@@ -147,10 +199,17 @@ export default function SmartParkingPage() {
     setStats(data);
   };
 
+  const loadReports = async () => {
+    const res = await fetch(`${API_PREFIX}/reports?limit=12`);
+    const data = await res.json().catch(() => []);
+    setReportHistory(Array.isArray(data) ? data : []);
+  };
+
   useEffect(() => {
     loadLogs();
     loadAlerts();
     loadStats();
+    loadReports();
     const interval = window.setInterval(() => {
       loadLogs();
       loadAlerts();
@@ -161,6 +220,83 @@ export default function SmartParkingPage() {
 
   const resetTransient = () => {
     setError("");
+  };
+
+  const resetReportError = () => {
+    setReportError("");
+  };
+
+  const buildReportPayload = () => {
+    resetReportError();
+    if (reportType === "daily") {
+      if (!reportDate) return null;
+      return { report_type: reportType, date: reportDate };
+    }
+    if (reportType === "weekly") {
+      return { report_type: reportType, year: Number(reportYear), week: Number(reportWeek) };
+    }
+    if (reportType === "monthly") {
+      return { report_type: reportType, year: Number(reportYear), month: Number(reportMonth) };
+    }
+    if (reportType === "yearly") {
+      return { report_type: reportType, year: Number(reportYear) };
+    }
+    if (reportType === "custom") {
+      if (!reportStartDate || !reportEndDate) return null;
+      return { report_type: reportType, start_date: reportStartDate, end_date: reportEndDate };
+    }
+    return null;
+  };
+
+  const previewReport = async () => {
+    const payload = buildReportPayload();
+    if (!payload) {
+      setReportError("Champs manquants pour la previsualisation.");
+      return;
+    }
+    setReportLoading(true);
+    try {
+      const res = await fetch(`${API_PREFIX}/reports/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || "Previsualisation impossible.");
+      }
+      setReportPreview(data);
+    } catch (err) {
+      setReportError(err.message || "Erreur de previsualisation.");
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const generateReportPdf = async () => {
+    const payload = buildReportPayload();
+    if (!payload) {
+      setReportError("Champs manquants pour la generation.");
+      return;
+    }
+    setReportLoading(true);
+    try {
+      const res = await fetch(`${API_PREFIX}/reports/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || "Generation impossible.");
+      }
+      setReportPreview((prev) => (prev ? { ...prev, download_url: data.download_url } : data));
+      await loadReports();
+    } catch (err) {
+      setReportError(err.message || "Erreur de generation.");
+    } finally {
+      setReportLoading(false);
+    }
   };
 
   const submit = async (event) => {
@@ -614,6 +750,224 @@ export default function SmartParkingPage() {
                   <span>{formatTimestamp(item.detected_at)}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="panel parking-section reports">
+          <div className="panel-header">
+            <h2>Rapports de presence</h2>
+            <p>Generer des rapports PDF et suivre la presence par periode.</p>
+          </div>
+          <div className="reports-grid">
+            <div className="reports-card">
+              <h3>Generation</h3>
+              <div className="reports-form">
+                <label>
+                  <span>Type de rapport</span>
+                  <select
+                    value={reportType}
+                    onChange={(event) => {
+                      setReportType(event.target.value);
+                      setReportPreview(null);
+                    }}
+                  >
+                    {REPORT_TYPES.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {reportType === "daily" && (
+                  <label>
+                    <span>Date</span>
+                    <input type="date" value={reportDate} onChange={(event) => setReportDate(event.target.value)} />
+                  </label>
+                )}
+
+                {reportType === "weekly" && (
+                  <div className="reports-inline">
+                    <label>
+                      <span>Annee</span>
+                      <input
+                        type="number"
+                        min="2020"
+                        max="2100"
+                        value={reportYear}
+                        onChange={(event) => setReportYear(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>Semaine</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="53"
+                        value={reportWeek}
+                        onChange={(event) => setReportWeek(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {reportType === "monthly" && (
+                  <div className="reports-inline">
+                    <label>
+                      <span>Annee</span>
+                      <input
+                        type="number"
+                        min="2020"
+                        max="2100"
+                        value={reportYear}
+                        onChange={(event) => setReportYear(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>Mois</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="12"
+                        value={reportMonth}
+                        onChange={(event) => setReportMonth(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {reportType === "yearly" && (
+                  <label>
+                    <span>Annee</span>
+                    <input
+                      type="number"
+                      min="2020"
+                      max="2100"
+                      value={reportYear}
+                      onChange={(event) => setReportYear(event.target.value)}
+                    />
+                  </label>
+                )}
+
+                {reportType === "custom" && (
+                  <div className="reports-inline">
+                    <label>
+                      <span>Date debut</span>
+                      <input
+                        type="date"
+                        value={reportStartDate}
+                        onChange={(event) => setReportStartDate(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>Date fin</span>
+                      <input
+                        type="date"
+                        value={reportEndDate}
+                        onChange={(event) => setReportEndDate(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                )}
+
+                <div className="reports-actions">
+                  <button type="button" className="btn secondary" onClick={previewReport} disabled={reportLoading}>
+                    {reportLoading ? "..." : "Previsualiser"}
+                  </button>
+                  <button type="button" className="btn primary" onClick={generateReportPdf} disabled={reportLoading}>
+                    {reportLoading ? "..." : "Generer PDF"}
+                  </button>
+                </div>
+
+                {reportError && <p className="state error">Erreur: {reportError}</p>}
+              </div>
+            </div>
+
+            <div className="reports-card">
+              <h3>Previsualisation</h3>
+              {!reportPreview && <p className="state">Aucune previsualisation disponible.</p>}
+              {reportPreview && (
+                <div className="reports-preview">
+                  <div className="reports-meta">
+                    <span>Type: {reportTypeLabel(reportPreview.report_type)}</span>
+                    <span>
+                      Periode: {reportPreview.start_date} au {reportPreview.end_date}
+                    </span>
+                    <span>Genere le: {formatTimestamp(reportPreview.generated_at)}</span>
+                  </div>
+                  <div className="reports-stats">
+                    <div>
+                      <span>Total employes</span>
+                      <strong>{reportPreview.summary.total_employees}</strong>
+                    </div>
+                    <div>
+                      <span>Presents</span>
+                      <strong>{reportPreview.summary.employees_present}</strong>
+                    </div>
+                    <div>
+                      <span>Retards</span>
+                      <strong>{reportPreview.summary.total_late}</strong>
+                    </div>
+                    <div>
+                      <span>Anomalies</span>
+                      <strong>{reportPreview.summary.total_anomalies}</strong>
+                    </div>
+                    <div>
+                      <span>Temps total</span>
+                      <strong>{formatMinutes(reportPreview.summary.total_presence_minutes)}</strong>
+                    </div>
+                    <div>
+                      <span>Temps moyen</span>
+                      <strong>{formatMinutes(reportPreview.summary.avg_presence_minutes)}</strong>
+                    </div>
+                  </div>
+                  <div className="reports-table">
+                    <div className="reports-table-header">
+                      <span>Employe</span>
+                      <span>Plaque</span>
+                      <span>Jours presents</span>
+                      <span>Retards</span>
+                      <span>Temps total</span>
+                      <span>Statut</span>
+                    </div>
+                    {(reportPreview.employees || []).slice(0, 8).map((employee) => (
+                      <div key={employee.plate_number || employee.full_name} className="reports-table-row">
+                        <span>{employee.full_name}</span>
+                        <span>{formatPlateDisplay(employee.plate_number)}</span>
+                        <span>{employee.days_present}</span>
+                        <span>{employee.late_count}</span>
+                        <span>{formatMinutes(employee.total_minutes)}</span>
+                        <span>{employee.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {reportPreview.download_url && (
+                    <a className="btn secondary" href={reportPreview.download_url} target="_blank" rel="noreferrer">
+                      Telecharger PDF
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="reports-card">
+              <h3>Historique</h3>
+              {reportHistory.length === 0 && <p className="state">Aucun rapport genere.</p>}
+              <div className="reports-history">
+                {reportHistory.map((item) => (
+                  <div key={item.report_id} className="reports-history-item">
+                    <div>
+                      <strong>{reportTypeLabel(item.report_type)}</strong>
+                      <span>{item.start_date} au {item.end_date}</span>
+                      <span>{formatTimestamp(item.generated_at)}</span>
+                    </div>
+                    <a className="btn secondary" href={item.download_url} target="_blank" rel="noreferrer">
+                      Telecharger
+                    </a>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>

@@ -4,9 +4,12 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     Column,
+    Date,
     DateTime,
     Integer,
+    JSON,
     MetaData,
     String,
     Table,
@@ -19,6 +22,7 @@ from sqlalchemy import (
     update,
 )
 
+from app.anpr.plate_utils import normalize_plate, plate_loose_key
 from app.db import IS_SQLITE, engine
 from app.db.session import DB_SCHEMA
 
@@ -32,6 +36,18 @@ vehicles = Table(
     Column("owner_name", String(128), nullable=False),
     Column("vehicle_type", String(64), nullable=False),
     Column("status", String(32), nullable=False),
+    Column("created_at", DateTime, nullable=False, server_default=func.now()),
+)
+
+employees = Table(
+    "employees",
+    METADATA,
+    Column("id", Integer, primary_key=True),
+    Column("full_name", String(128), nullable=False),
+    Column("plate_number", String(32), nullable=False, unique=True, index=True),
+    Column("department", String(128), nullable=True),
+    Column("employee_code", String(64), nullable=True),
+    Column("is_active", Boolean, nullable=False, server_default=text("1" if IS_SQLITE else "true")),
     Column("created_at", DateTime, nullable=False, server_default=func.now()),
 )
 
@@ -53,6 +69,20 @@ parking_logs = Table(
     Column("exit_time", DateTime, nullable=True),
     Column("status", String(32), nullable=False),
     Column("image_path", String(512), nullable=True),
+)
+
+attendance_reports = Table(
+    "attendance_reports",
+    METADATA,
+    Column("id", Integer, primary_key=True),
+    Column("report_type", String(32), nullable=False),
+    Column("start_date", Date, nullable=False),
+    Column("end_date", Date, nullable=False),
+    Column("generated_at", DateTime, nullable=False, server_default=func.now()),
+    Column("file_path", String(512), nullable=False),
+    Column("file_name", String(256), nullable=False),
+    Column("summary", JSON, nullable=True),
+    Column("metadata", JSON, nullable=True),
 )
 
 
@@ -100,6 +130,29 @@ def get_vehicle(plate_number: str) -> dict | None:
             .first()
         )
     return dict(row) if row else None
+
+
+def find_vehicle_by_plate(plate_number: str) -> dict | None:
+    if not plate_number:
+        return None
+    normalized = normalize_plate(plate_number)
+    target_key = plate_loose_key(plate_number)
+    direct = get_vehicle(plate_number)
+    if direct:
+        return direct
+    if normalized and normalized != plate_number:
+        direct = get_vehicle(normalized)
+        if direct:
+            return direct
+    with engine.begin() as connection:
+        rows = connection.execute(select(vehicles)).mappings().all()
+    for row in rows:
+        candidate_plate = row.get("plate_number") or ""
+        if normalize_plate(candidate_plate) == normalized:
+            return dict(row)
+        if target_key and plate_loose_key(candidate_plate) == target_key:
+            return dict(row)
+    return None
 
 
 def insert_unknown_detection(plate_number: str, image_path: str | None, detected_at: datetime) -> int:
@@ -265,6 +318,167 @@ def stats_snapshot() -> dict:
         "average_parking_minutes_today": float(avg_minutes) if avg_minutes is not None else 0.0,
         "currently_inside": int(currently_inside),
     }
+
+
+def fetch_vehicles(active_only: bool = False) -> list[dict]:
+    query = select(vehicles)
+    if active_only:
+        query = query.where(vehicles.c.status == "AUTHORIZED")
+    with engine.begin() as connection:
+        rows = connection.execute(query).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def fetch_employees(active_only: bool = False) -> list[dict]:
+    query = select(employees)
+    if active_only:
+        query = query.where(employees.c.is_active.is_(True))
+    with engine.begin() as connection:
+        rows = connection.execute(query).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def fetch_parking_logs_range(start_time: datetime, end_time: datetime) -> list[dict]:
+    query = (
+        select(parking_logs)
+        .where(and_(parking_logs.c.entry_time >= start_time, parking_logs.c.entry_time < end_time))
+        .order_by(parking_logs.c.entry_time)
+    )
+    with engine.begin() as connection:
+        rows = connection.execute(query).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def fetch_unknown_detections_range(start_time: datetime, end_time: datetime) -> list[dict]:
+    query = (
+        select(unknown_detections)
+        .where(and_(unknown_detections.c.detected_at >= start_time, unknown_detections.c.detected_at < end_time))
+        .order_by(unknown_detections.c.detected_at)
+    )
+    with engine.begin() as connection:
+        rows = connection.execute(query).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def insert_attendance_report(
+    report_type: str,
+    start_date: datetime,
+    end_date: datetime,
+    file_path: str,
+    file_name: str,
+    summary: dict | None = None,
+    metadata: dict | None = None,
+) -> int:
+    with engine.begin() as connection:
+        result = connection.execute(
+            insert(attendance_reports).values(
+                report_type=report_type,
+                start_date=start_date.date(),
+                end_date=end_date.date(),
+                file_path=file_path,
+                file_name=file_name,
+                summary=summary,
+                metadata=metadata,
+            )
+        )
+        inserted = result.inserted_primary_key
+    return int(inserted[0]) if inserted else 0
+
+
+def fetch_attendance_reports(limit: int = 50) -> list[dict]:
+    query = select(attendance_reports).order_by(desc(attendance_reports.c.generated_at)).limit(limit)
+    with engine.begin() as connection:
+        rows = connection.execute(query).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def get_attendance_report(report_id: int) -> dict | None:
+    with engine.begin() as connection:
+        row = (
+            connection.execute(select(attendance_reports).where(attendance_reports.c.id == report_id))
+            .mappings()
+            .first()
+        )
+    return dict(row) if row else None
+
+
+def upsert_authorized_employee(
+    *,
+    full_name: str,
+    department: str,
+    plate_number: str,
+    is_authorized: bool = True,
+    employee_code: str | None = None,
+) -> dict:
+    if not plate_number:
+        raise ValueError("plate_number is required")
+    normalized = normalize_plate(plate_number)
+    plate_storage = normalized or plate_number
+    status = "AUTHORIZED" if is_authorized else "BLACKLISTED"
+
+    with engine.begin() as connection:
+        vehicle_row = (
+            connection.execute(select(vehicles).where(vehicles.c.plate_number == plate_number))
+            .mappings()
+            .first()
+        )
+        if not vehicle_row and normalized and normalized != plate_number:
+            vehicle_row = (
+                connection.execute(select(vehicles).where(vehicles.c.plate_number == normalized))
+                .mappings()
+                .first()
+            )
+        if vehicle_row:
+            connection.execute(
+                update(vehicles)
+                .where(vehicles.c.id == vehicle_row["id"])
+                .values(owner_name=full_name, vehicle_type=department, status=status)
+            )
+            vehicle_id = int(vehicle_row["id"])
+        else:
+            result = connection.execute(
+                insert(vehicles).values(
+                    plate_number=plate_storage,
+                    owner_name=full_name,
+                    vehicle_type=department,
+                    status=status,
+                )
+            )
+            inserted = result.inserted_primary_key
+            vehicle_id = int(inserted[0]) if inserted else 0
+
+        employee_row = (
+            connection.execute(select(employees).where(employees.c.plate_number == plate_number))
+            .mappings()
+            .first()
+        )
+        if not employee_row and normalized and normalized != plate_number:
+            employee_row = (
+                connection.execute(select(employees).where(employees.c.plate_number == normalized))
+                .mappings()
+                .first()
+            )
+        if employee_row:
+            connection.execute(
+                update(employees)
+                .where(employees.c.id == employee_row["id"])
+                .values(full_name=full_name, department=department, is_active=is_authorized, employee_code=employee_code)
+            )
+            employee_id = int(employee_row["id"])
+        else:
+            result = connection.execute(
+                insert(employees).values(
+                    full_name=full_name,
+                    plate_number=plate_storage,
+                    department=department,
+                    employee_code=employee_code,
+                    is_active=is_authorized,
+                )
+            )
+            inserted = result.inserted_primary_key
+            employee_id = int(inserted[0]) if inserted else 0
+
+    return {"vehicle_id": vehicle_id, "employee_id": employee_id, "plate_number": plate_storage}
 
 
 def run_query(sql: str) -> list[dict[str, Any]]:

@@ -43,3 +43,20 @@ class AskResponse(BaseModel):
     answer: str
     sql: str
     rows: list[dict[str, Any]]
+
+
+class AuthorizedEmployeeRequest(BaseModel):
+    full_name: str
+    department: str
+    plate_number: str
+    is_authorized: bool = True
+    employee_code: str | None = None
+
+
+class AuthorizedEmployeeResponse(BaseModel):
+    full_name: str
+    department: str
+    plate_number: str
+    authorized: bool
+    vehicle_id: int
+    employee_id: int
