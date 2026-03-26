@@ -261,7 +261,7 @@ export default function PresenceAnalysis({ apiPrefix }) {
               {reportType === "weekly" && (
                 <div className="presence-inline">
                   <label>
-                    <span>Date d?but</span>
+                    <span>Date début</span>
                     <input
                       type="date"
                       value={reportStartDate}
@@ -282,7 +282,7 @@ export default function PresenceAnalysis({ apiPrefix }) {
               {reportType === "monthly" && (
                 <div className="presence-inline">
                   <label>
-                    <span>Ann?e</span>
+                    <span>Année</span>
                     <input
                       type="number"
                       min="2020"
@@ -306,7 +306,7 @@ export default function PresenceAnalysis({ apiPrefix }) {
 
               {reportType === "yearly" && (
                 <label>
-                  <span>Ann?e</span>
+                  <span>Année</span>
                   <input
                     type="number"
                     min="2020"
@@ -319,18 +319,18 @@ export default function PresenceAnalysis({ apiPrefix }) {
 
               <div className="presence-actions">
                 <button type="button" className="btn primary" onClick={generateReport} disabled={reportLoading}>
-                  {reportLoading ? "..." : "G?n?rer PDF"}
+                  {reportLoading ? "..." : "Générer PDF"}
                 </button>
                 <button type="button" className="btn ghost" onClick={resetReportForm} disabled={reportLoading}>
-                  R?initialiser
+                  Réinitialiser
                 </button>
               </div>
               {reportError && <p className="presence-error">Erreur: {reportError}</p>}
               {reportResult?.download_url && (
                 <div className="presence-report-ready">
-                  <span>PDF pr?t.</span>
+                  <span>PDF prêt.</span>
                   <a className="btn secondary" href={reportResult.download_url} target="_blank" rel="noreferrer">
-                    T?l?charger PDF
+                    Télécharger PDF
                   </a>
                 </div>
               )}
