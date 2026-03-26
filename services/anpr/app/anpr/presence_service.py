@@ -8,7 +8,6 @@ from app.anpr.database import (
     fetch_employees,
     fetch_parking_logs_range,
     fetch_unknown_detections_range,
-    fetch_vehicles,
 )
 from app.anpr.reporting_service import _build_presence_config
 from app.anpr.plate_utils import normalize_plate, plate_loose_key
@@ -41,11 +40,6 @@ def _employees_map() -> dict[str, dict[str, Any]]:
     return {row["plate_number"]: row for row in employees if row.get("plate_number")}
 
 
-def _vehicles_map() -> dict[str, dict[str, Any]]:
-    vehicles = fetch_vehicles()
-    return {row["plate_number"]: row for row in vehicles if row.get("plate_number")}
-
-
 def _build_directory() -> dict[str, dict[str, Any]]:
     directory: dict[str, dict[str, Any]] = {}
     employees_by_plate = _employees_map()
@@ -57,23 +51,6 @@ def _build_directory() -> dict[str, dict[str, Any]]:
             "full_name": employee.get("full_name"),
             "department": employee.get("department"),
         }
-
-    vehicles_by_plate = _vehicles_map()
-    for plate, vehicle in vehicles_by_plate.items():
-        if not plate:
-            continue
-        if (vehicle.get("status") or "").upper() != "AUTHORIZED":
-            continue
-        if plate not in directory:
-            directory[plate] = {
-                "plate_number": plate,
-                "full_name": vehicle.get("owner_name"),
-                "department": vehicle.get("vehicle_type"),
-            }
-        else:
-            entry = directory[plate]
-            entry.setdefault("full_name", vehicle.get("owner_name"))
-            entry.setdefault("department", vehicle.get("vehicle_type"))
     return directory
 
 
@@ -119,7 +96,7 @@ def getPresenceOverviewDashboard(target_date: date | None = None) -> dict[str, A
     start_dt, end_dt = _date_bounds(target_date)
     logs = fetch_parking_logs_range(start_dt, end_dt)
     logs.sort(key=lambda item: item.get("entry_time") or datetime.min, reverse=True)
-    recent = logs[:10]
+    recent = []
 
     present_plates: set[str] = set()
     first_entry_by_plate: dict[str, datetime] = {}
@@ -134,6 +111,7 @@ def getPresenceOverviewDashboard(target_date: date | None = None) -> dict[str, A
         )
         if not entry:
             continue
+        recent.append(log)
         canonical_plate = entry.get("plate_number")
         if not canonical_plate:
             continue

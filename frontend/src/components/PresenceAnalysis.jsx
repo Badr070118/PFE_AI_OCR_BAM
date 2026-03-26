@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatPlateDisplay } from "../utils/plate";
 
 const TABS = [
@@ -21,6 +21,40 @@ const formatTimestamp = (value) => {
   return date.toLocaleString();
 };
 
+const normalizePlateQuery = (value) => {
+  if (!value) return "";
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u064b-\u065f\u0670\u0640]/g, "")
+    .replace(/[\u200c\u200d\u200e\u200f]/g, "")
+    .replace(/[\u2066-\u2069]/g, "")
+    .replace(/[\s-]+/g, "");
+};
+
+const formatTimeValue = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+};
+
+const parseTimeFilter = (value) => {
+  const trimmed = value.trim();
+  if (!trimmed) return { mode: "none" };
+  const exactMatch = trimmed.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (exactMatch) {
+    return { mode: "exact", hour: Number(exactMatch[1]), minute: Number(exactMatch[2]) };
+  }
+  const hourMatch = trimmed.match(/^([01]?\d|2[0-3])(?::)?$/);
+  if (hourMatch) {
+    return { mode: "hour", hour: Number(hourMatch[1]) };
+  }
+  return { mode: "invalid" };
+};
+
 
 const toDateInput = (value) => {
   if (!value) return "";
@@ -39,6 +73,7 @@ export default function PresenceAnalysis({ apiPrefix }) {
   const [overviewDate, setOverviewDate] = useState(todayIso);
   const [overview, setOverview] = useState(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
+  const lastLogSignatureRef = useRef("");
 
   const [reportType, setReportType] = useState("daily");
   const [reportDate, setReportDate] = useState(todayIso);
@@ -52,6 +87,86 @@ export default function PresenceAnalysis({ apiPrefix }) {
 
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyMode, setHistoryMode] = useState("period");
+  const [historyStartDate, setHistoryStartDate] = useState("");
+  const [historyEndDate, setHistoryEndDate] = useState("");
+  const [historyGeneratedDate, setHistoryGeneratedDate] = useState("");
+  const [accessQuery, setAccessQuery] = useState("");
+  const [accessTimeMode, setAccessTimeMode] = useState("entry");
+  const [accessTimeValue, setAccessTimeValue] = useState("");
+
+  const resetAccessFilters = () => {
+    setAccessQuery("");
+    setAccessTimeMode("entry");
+    setAccessTimeValue("");
+  };
+
+  const filteredAccesses = useMemo(() => {
+    const items = overview?.recent_accesses || [];
+    const needle = accessQuery.trim();
+    const timeNeedle = accessTimeValue.trim();
+    const timeFilter = parseTimeFilter(timeNeedle);
+    if (timeNeedle && timeFilter.mode === "invalid") return [];
+    if (!needle && !timeNeedle) return items;
+    const lowered = needle.toLowerCase();
+    const normalizedNeedle = normalizePlateQuery(needle);
+
+    return items.filter((item) => {
+      let matchesSearch = true;
+      if (needle) {
+        const name = (item.employee_name || "").toLowerCase();
+        const plate = item.plate_number || "";
+        const normalizedPlate = normalizePlateQuery(plate);
+        const displayPlate = formatPlateDisplay(plate);
+        const normalizedDisplay = normalizePlateQuery(displayPlate);
+        matchesSearch = name.includes(lowered)
+          || normalizedPlate === normalizedNeedle
+          || normalizedDisplay === normalizedNeedle;
+      }
+
+      if (!matchesSearch) return false;
+      if (!timeNeedle) return true;
+
+      const sourceTime = accessTimeMode === "exit" ? item.exit_time : item.entry_time;
+      if (!sourceTime) return false;
+      const date = new Date(sourceTime);
+      if (Number.isNaN(date.getTime())) return false;
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+
+      if (timeFilter.mode === "exact") {
+        return hours === timeFilter.hour && minutes === timeFilter.minute;
+      }
+      if (timeFilter.mode === "hour") {
+        return hours >= timeFilter.hour;
+      }
+      return false;
+    });
+  }, [overview, accessQuery, accessTimeMode, accessTimeValue]);
+
+  const filteredHistory = useMemo(() => {
+    if (historyMode === "generated") {
+      const target = historyGeneratedDate.trim();
+      if (!target) return history;
+      return history.filter((item) => {
+        if (!item.generated_at) return false;
+        const generated = new Date(item.generated_at);
+        if (Number.isNaN(generated.getTime())) return false;
+        return generated.toISOString().slice(0, 10) === target;
+      });
+    }
+
+    const start = historyStartDate.trim();
+    const end = historyEndDate.trim();
+    if (!start && !end) return history;
+
+    return history.filter((item) => {
+      if (!item.start_date || !item.end_date) return false;
+      if (start && item.end_date < start) return false;
+      if (end && item.start_date > end) return false;
+      return true;
+    });
+  }, [history, historyMode, historyGeneratedDate, historyStartDate, historyEndDate]);
 
   const buildReportPayload = () => {
     setReportError("");
@@ -82,6 +197,20 @@ export default function PresenceAnalysis({ apiPrefix }) {
       setOverview({ error: err.message || "Erreur de chargement." });
     } finally {
       setOverviewLoading(false);
+    }
+  };
+
+  const fetchLatestLogSignature = async () => {
+    try {
+      const res = await fetch(`${apiPrefix}/logs?limit=1`);
+      const data = await res.json().catch(() => ({}));
+      const item = data?.items?.[0];
+      if (!item) return "";
+      const entry = item.entry_time || "";
+      const exit = item.exit_time || "";
+      return `${item.id || ""}|${entry}|${exit}`;
+    } catch {
+      return "";
     }
   };
 
@@ -136,10 +265,42 @@ export default function PresenceAnalysis({ apiPrefix }) {
 
   useEffect(() => {
     if (activeTab !== "overview") return undefined;
-    fetchOverview();
-    const interval = window.setInterval(fetchOverview, 10000);
-    return () => window.clearInterval(interval);
-  }, [activeTab, overviewDate]);
+    let isActive = true;
+
+    const bootstrap = async () => {
+      await fetchOverview();
+      const signature = await fetchLatestLogSignature();
+      if (isActive && signature) {
+        lastLogSignatureRef.current = signature;
+      }
+    };
+
+    bootstrap();
+
+    if (overviewDate !== todayIso) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    const interval = window.setInterval(async () => {
+      const signature = await fetchLatestLogSignature();
+      if (!signature) return;
+      if (!lastLogSignatureRef.current) {
+        lastLogSignatureRef.current = signature;
+        return;
+      }
+      if (signature !== lastLogSignatureRef.current) {
+        lastLogSignatureRef.current = signature;
+        await fetchOverview();
+      }
+    }, 8000);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(interval);
+    };
+  }, [activeTab, overviewDate, todayIso]);
 
   useEffect(() => {
     if (activeTab === "history") {
@@ -210,23 +371,70 @@ export default function PresenceAnalysis({ apiPrefix }) {
                   <p className="state">Aucun accès enregistré pour cette date.</p>
                 )}
                 {overview.recent_accesses?.length > 0 && (
-                  <div className="presence-table">
-                    <div className="presence-table-head">
-                      <span>Employé</span>
-                      <span>Plaque</span>
-                      <span>Entrée</span>
-                      <span>Sortie</span>
-                      <span>Statut</span>
+                  <div className="presence-access-filters">
+                    <label className="presence-filter">
+                      <span>Recherche</span>
+                      <input
+                        type="text"
+                        value={accessQuery}
+                        onChange={(event) => setAccessQuery(event.target.value)}
+                        placeholder="Ex: Salma ou 15181-د-8"
+                      />
+                    </label>
+                    <div className="presence-time-filter">
+                      <label className="presence-filter">
+                        <span>Filtrer par</span>
+                        <select value={accessTimeMode} onChange={(event) => setAccessTimeMode(event.target.value)}>
+                          <option value="entry">Heure d'entrée</option>
+                          <option value="exit">Heure de sortie</option>
+                        </select>
+                      </label>
+                      <label className="presence-filter">
+                        <span>Heure</span>
+                        <input
+                          type="text"
+                          value={accessTimeValue}
+                          onChange={(event) => setAccessTimeValue(event.target.value)}
+                          placeholder="Ex: 16 ou 15:45"
+                        />
+                      </label>
                     </div>
-                    {overview.recent_accesses.map((item) => (
-                      <div key={`${item.plate_number}-${item.entry_time}`} className="presence-table-row">
-                        <span>{item.employee_name || "-"}</span>
-                        <span>{formatPlateDisplay(item.plate_number)}</span>
-                        <span>{formatTimestamp(item.entry_time)}</span>
-                        <span>{formatTimestamp(item.exit_time)}</span>
-                        <span>{item.status}</span>
+                    <div className="presence-filter-actions">
+                      <span className="presence-filter-count">{filteredAccesses.length} accès</span>
+                      <button
+                        type="button"
+                        className="btn ghost presence-reset-btn"
+                        onClick={resetAccessFilters}
+                        disabled={!accessQuery && !accessTimeValue && accessTimeMode === "entry"}
+                      >
+                        Réinitialiser
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {overview.recent_accesses?.length > 0 && filteredAccesses.length === 0 && (
+                  <p className="state">Aucun accès ne correspond au filtre.</p>
+                )}
+                {overview.recent_accesses?.length > 0 && filteredAccesses.length > 0 && (
+                  <div className="presence-table-scroll">
+                    <div className="presence-table">
+                      <div className="presence-table-head">
+                        <span>Employé</span>
+                        <span>Plaque</span>
+                        <span>Entrée</span>
+                        <span>Sortie</span>
+                        <span>Statut</span>
                       </div>
-                    ))}
+                      {filteredAccesses.map((item) => (
+                        <div key={`${item.plate_number}-${item.entry_time}`} className="presence-table-row">
+                          <span>{item.employee_name || "-"}</span>
+                          <span>{formatPlateDisplay(item.plate_number)}</span>
+                          <span>{formatTimestamp(item.entry_time)}</span>
+                          <span>{formatTimestamp(item.exit_time)}</span>
+                          <span>{item.status}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -345,7 +553,63 @@ export default function PresenceAnalysis({ apiPrefix }) {
             <h3>Historique des rapports</h3>
             {historyLoading && <p className="state">Chargement...</p>}
             {!historyLoading && history.length === 0 && <p className="state">Aucun rapport généré.</p>}
-            {history.map((item) => (
+            {!historyLoading && history.length > 0 && (
+              <div className="presence-history-filters">
+                <label className="presence-filter">
+                  <span>Filtre date</span>
+                  <select value={historyMode} onChange={(event) => setHistoryMode(event.target.value)}>
+                    <option value="period">Période du rapport</option>
+                    <option value="generated">Date de génération</option>
+                  </select>
+                </label>
+                {historyMode === "generated" ? (
+                  <label className="presence-filter">
+                    <span>Date</span>
+                    <input
+                      type="date"
+                      value={historyGeneratedDate}
+                      onChange={(event) => setHistoryGeneratedDate(event.target.value)}
+                    />
+                  </label>
+                ) : (
+                  <>
+                    <label className="presence-filter">
+                      <span>Date début</span>
+                      <input
+                        type="date"
+                        value={historyStartDate}
+                        onChange={(event) => setHistoryStartDate(event.target.value)}
+                      />
+                    </label>
+                    <label className="presence-filter">
+                      <span>Date fin</span>
+                      <input
+                        type="date"
+                        value={historyEndDate}
+                        onChange={(event) => setHistoryEndDate(event.target.value)}
+                      />
+                    </label>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => {
+                    setHistoryStartDate("");
+                    setHistoryEndDate("");
+                    setHistoryGeneratedDate("");
+                  }}
+                  disabled={!historyStartDate && !historyEndDate && !historyGeneratedDate}
+                >
+                  Effacer
+                </button>
+                <span className="presence-filter-count">{filteredHistory.length} rapports</span>
+              </div>
+            )}
+            {!historyLoading && history.length > 0 && filteredHistory.length === 0 && (
+              <p className="state">Aucun rapport ne correspond au filtre.</p>
+            )}
+            {filteredHistory.map((item) => (
               <div key={item.report_id} className="presence-history-item">
                 <div>
                   <strong>{item.report_type}</strong>

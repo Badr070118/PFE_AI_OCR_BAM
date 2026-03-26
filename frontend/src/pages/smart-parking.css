@@ -101,12 +101,91 @@
     grid-area: reports;
   }
 
-  .parking-section.chat {
-    grid-area: chat;
-  }
+.parking-section.chat {
+  grid-area: chat;
+}
 }
 
-.parking-gate {
+.gate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.gate-status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.8);
+  box-shadow: 0 0 0 6px rgba(148, 163, 184, 0.15);
+}
+
+.gate-status-dot.processing {
+  background: rgba(245, 158, 11, 0.9);
+  box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.18);
+  animation: gatePulse 1.4s ease-in-out infinite;
+}
+
+.gate-status-dot.authorized {
+  background: rgba(16, 185, 129, 0.9);
+  box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.18);
+}
+
+.gate-status-dot.denied {
+  background: rgba(245, 158, 11, 0.9);
+  box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.18);
+}
+
+.gate-status-dot.blacklisted {
+  background: rgba(239, 68, 68, 0.9);
+  box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.18);
+}
+
+.gate-status-dot.unknown {
+  background: rgba(239, 68, 68, 0.9);
+  box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.18);
+}
+
+.gate-card {
+  display: grid;
+  gap: 1rem;
+  border-radius: 18px;
+  padding: 1rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: linear-gradient(140deg, #f8f7f2, #ffffff);
+  box-shadow: 0 16px 30px -26px rgba(15, 23, 42, 0.35);
+}
+
+.gate-controls {
+  margin-top: 0.75rem;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.gate-card.status-authorized {
+  border-color: rgba(16, 185, 129, 0.28);
+}
+
+.gate-card.status-blacklisted {
+  border-color: rgba(239, 68, 68, 0.28);
+}
+
+.gate-card.status-denied {
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.gate-card.status-processing {
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.gate-card.status-unknown {
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+.gate-visual {
   position: relative;
   height: 140px;
   border-radius: 16px;
@@ -118,41 +197,113 @@
   justify-content: center;
 }
 
-.parking-gate-post {
+.gate-post {
   position: absolute;
   left: 18%;
   bottom: 0;
   width: 22px;
-  height: 60px;
+  height: 64px;
   background: #2f2f2f;
   border-radius: 6px 6px 0 0;
 }
 
-.parking-gate-arm {
+.gate-base {
+  position: absolute;
+  bottom: 6px;
+  left: 12%;
+  width: 76%;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.35);
+}
+
+.gate-arm {
   position: absolute;
   left: 18%;
-  bottom: 48px;
-  width: 58%;
+  bottom: 54px;
+  width: 60%;
   height: 10px;
-  background: linear-gradient(90deg, #d93f3f, #f6d365);
+  background: linear-gradient(90deg, #94a3b8, #cbd5f5);
   border-radius: 999px;
   transform-origin: left center;
-  transition: transform 0.5s ease;
+  transition: transform 0.6s ease;
+  box-shadow: 0 6px 12px -8px rgba(15, 23, 42, 0.4);
 }
 
-.parking-gate.open .parking-gate-arm {
-  transform: rotate(-25deg);
+.gate-card.status-authorized .gate-arm {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
 }
 
-.parking-gate.closed .parking-gate-arm {
+.gate-card.status-unknown .gate-arm,
+.gate-card.status-blacklisted .gate-arm {
+  background: linear-gradient(90deg, #ef4444, #b91c1c);
+}
+
+.gate-card.status-denied .gate-arm {
+  background: linear-gradient(90deg, #f59e0b, #f97316);
+}
+
+.gate-card.status-processing .gate-arm {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+
+.gate-card.open .gate-arm {
+  transform: rotate(-40deg);
+}
+
+.gate-card.closed .gate-arm {
   transform: rotate(0deg);
 }
 
-.parking-gate-meta {
+.gate-meta {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.gate-badge-row {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-top: 1rem;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.gate-action {
+  font-size: 0.9rem;
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.gate-info-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.gate-info-item {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.75);
+}
+
+.gate-info-item strong {
+  font-size: 0.95rem;
+  color: rgba(15, 23, 42, 0.95);
+}
+
+.gate-info-wide {
+  grid-column: 1 / -1;
+}
+
+@keyframes gatePulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .parking-live {
@@ -179,6 +330,34 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+.blacklist-form {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: 12px;
+  background: #fff7f5;
+}
+
+.blacklist-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: rgba(15, 23, 42, 0.8);
+}
+
+.blacklist-form textarea {
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.state.success {
+  color: #15803d;
 }
 
 .parking-stats {
@@ -377,6 +556,16 @@
   color: #334155;
 }
 
+.status-idle {
+  background: rgba(148, 163, 184, 0.2);
+  color: #334155;
+}
+
+.status-processing {
+  background: rgba(245, 158, 11, 0.2);
+  color: #92400e;
+}
+
 .status-denied {
   background: rgba(245, 158, 11, 0.2);
   color: #92400e;
@@ -553,6 +742,77 @@
   gap: 0.4rem;
 }
 
+.presence-access-filters {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: minmax(240px, 1fr) minmax(220px, 0.8fr) auto;
+  align-items: end;
+  margin: 0.45rem 0 0.6rem 0;
+}
+
+.presence-time-filter {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.presence-history-filters {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: minmax(180px, 240px) minmax(160px, 1fr) minmax(160px, 1fr) auto auto;
+  align-items: end;
+  margin: 0.6rem 0 0.8rem 0;
+}
+
+.presence-filter {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.8);
+}
+
+.presence-filter select,
+.presence-filter input {
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  border-radius: 10px;
+  padding: 0.4rem 0.55rem;
+  background: #fff;
+  font-size: 0.9rem;
+}
+
+.presence-filter-count {
+  font-size: 0.8rem;
+  color: rgba(15, 23, 42, 0.6);
+  justify-self: end;
+}
+
+.presence-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-self: end;
+}
+
+.presence-reset-btn {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.presence-table-scroll {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.presence-table-scroll .presence-table-head {
+  position: sticky;
+  top: 0;
+  background: #f8f7f2;
+  border-radius: 8px;
+  padding: 0.35rem 0.2rem;
+  z-index: 1;
+}
+
 .presence-table-head,
 .presence-table-row {
   display: grid;
@@ -724,6 +984,36 @@
   .presence-table-head,
   .presence-table-row {
     grid-template-columns: 1fr;
+  }
+
+  .presence-access-filters {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .presence-history-filters {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .presence-time-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .presence-filter-count {
+    justify-self: start;
+  }
+
+  .presence-filter-actions {
+    justify-self: start;
+  }
+
+  .gate-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gate-visual {
+    height: 120px;
   }
 
   .presence-history-item {

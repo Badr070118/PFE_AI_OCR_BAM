@@ -36,6 +36,8 @@ vehicles = Table(
     Column("owner_name", String(128), nullable=False),
     Column("vehicle_type", String(64), nullable=False),
     Column("status", String(32), nullable=False),
+    Column("blacklist_reason", String(512), nullable=True),
+    Column("blacklisted_at", DateTime, nullable=True),
     Column("created_at", DateTime, nullable=False, server_default=func.now()),
 )
 
@@ -69,6 +71,12 @@ parking_logs = Table(
     Column("exit_time", DateTime, nullable=True),
     Column("status", String(32), nullable=False),
     Column("image_path", String(512), nullable=True),
+    Column(
+        "manual_opened",
+        Boolean,
+        nullable=False,
+        server_default=text("0" if IS_SQLITE else "false"),
+    ),
 )
 
 attendance_reports = Table(
@@ -174,6 +182,7 @@ def log_detection(
     image_path: str | None,
     detected_at: datetime,
 ) -> dict:
+    manual_opened = status not in {"UNKNOWN", "BLACKLISTED", "NO_PLATE"}
     with engine.begin() as connection:
         open_log = (
             connection.execute(
@@ -201,6 +210,7 @@ def log_detection(
                 exit_time=None,
                 status=status,
                 image_path=image_path,
+                manual_opened=manual_opened,
             )
         )
         inserted = result.inserted_primary_key
@@ -217,10 +227,51 @@ def log_no_plate(image_path: str | None, detected_at: datetime) -> dict:
                 exit_time=None,
                 status="NO_PLATE",
                 image_path=image_path,
+                manual_opened=False,
             )
         )
         inserted = result.inserted_primary_key
     return {"log_id": int(inserted[0]) if inserted else 0, "event": "entry"}
+
+
+def mark_manual_open(plate_number: str, opened_at: datetime) -> dict:
+    normalized = normalize_plate(plate_number)
+    target_key = plate_loose_key(plate_number)
+    with engine.begin() as connection:
+        rows = (
+            connection.execute(
+                select(parking_logs)
+                .where(
+                    and_(
+                        parking_logs.c.exit_time.is_(None),
+                        parking_logs.c.status.in_(["UNKNOWN", "BLACKLISTED"]),
+                    )
+                )
+                .order_by(desc(parking_logs.c.entry_time))
+            )
+            .mappings()
+            .all()
+        )
+        open_log = None
+        for row in rows:
+            candidate = row.get("plate_number") or ""
+            if candidate == plate_number:
+                open_log = row
+                break
+            if normalized and normalize_plate(candidate) == normalized:
+                open_log = row
+                break
+            if target_key and plate_loose_key(candidate) == target_key:
+                open_log = row
+                break
+        if not open_log:
+            return {"updated": False, "log_id": None}
+        connection.execute(
+            update(parking_logs)
+            .where(parking_logs.c.id == open_log["id"])
+            .values(entry_time=opened_at, manual_opened=True)
+        )
+    return {"updated": True, "log_id": int(open_log["id"])}
 
 
 def close_parking_session(plate_number: str, exit_time: datetime) -> dict:
@@ -263,8 +314,33 @@ def fetch_unknown_detections(limit: int = 50) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def delete_unknown_detections_by_plate(plate_number: str) -> int:
+    if not plate_number:
+        return 0
+    normalized = normalize_plate(plate_number)
+    targets = {plate_number}
+    if normalized:
+        targets.add(normalized)
+    with engine.begin() as connection:
+        result = connection.execute(unknown_detections.delete().where(unknown_detections.c.plate_number.in_(targets)))
+    return int(result.rowcount or 0)
+
+
+def fetch_blacklisted_vehicles(limit: int = 50) -> list[dict]:
+    order_col = func.coalesce(vehicles.c.blacklisted_at, vehicles.c.created_at)
+    query = (
+        select(vehicles)
+        .where(vehicles.c.status == "BLACKLISTED")
+        .order_by(desc(order_col))
+        .limit(limit)
+    )
+    with engine.begin() as connection:
+        rows = connection.execute(query).mappings().all()
+    return [dict(row) for row in rows]
+
+
 def fetch_alerts(limit: int = 50) -> dict:
-    blacklisted = fetch_logs(limit=limit, status="BLACKLISTED")
+    blacklisted = fetch_blacklisted_vehicles(limit=limit)
     unknown = fetch_unknown_detections(limit=limit)
     return {"blacklisted": blacklisted, "unknown": unknown}
 
@@ -479,6 +555,72 @@ def upsert_authorized_employee(
             employee_id = int(inserted[0]) if inserted else 0
 
     return {"vehicle_id": vehicle_id, "employee_id": employee_id, "plate_number": plate_storage}
+
+
+def upsert_blacklisted_vehicle(
+    *,
+    plate_number: str,
+    reason: str,
+    owner_name: str | None = None,
+    vehicle_type: str | None = None,
+    detected_at: datetime | None = None,
+) -> dict:
+    if not plate_number:
+        raise ValueError("plate_number is required")
+    normalized = normalize_plate(plate_number)
+    plate_storage = normalized or plate_number
+    timestamp = detected_at or datetime.now()
+
+    with engine.begin() as connection:
+        vehicle_row = (
+            connection.execute(select(vehicles).where(vehicles.c.plate_number == plate_number))
+            .mappings()
+            .first()
+        )
+        if not vehicle_row and normalized and normalized != plate_number:
+            vehicle_row = (
+                connection.execute(select(vehicles).where(vehicles.c.plate_number == normalized))
+                .mappings()
+                .first()
+            )
+
+        payload = {
+            "status": "BLACKLISTED",
+            "blacklist_reason": reason,
+            "blacklisted_at": timestamp,
+        }
+        if owner_name:
+            payload["owner_name"] = owner_name
+        if vehicle_type:
+            payload["vehicle_type"] = vehicle_type
+
+        if vehicle_row:
+            connection.execute(
+                update(vehicles)
+                .where(vehicles.c.id == vehicle_row["id"])
+                .values(**payload)
+            )
+            vehicle_id = int(vehicle_row["id"])
+        else:
+            result = connection.execute(
+                insert(vehicles).values(
+                    plate_number=plate_storage,
+                    owner_name=owner_name or "Unknown",
+                    vehicle_type=vehicle_type or "unknown",
+                    status="BLACKLISTED",
+                    blacklist_reason=reason,
+                    blacklisted_at=timestamp,
+                )
+            )
+            inserted = result.inserted_primary_key
+            vehicle_id = int(inserted[0]) if inserted else 0
+
+    return {
+        "vehicle_id": vehicle_id,
+        "plate_number": plate_storage,
+        "blacklist_reason": reason,
+        "blacklisted_at": timestamp,
+    }
 
 
 def run_query(sql: str) -> list[dict[str, Any]]:

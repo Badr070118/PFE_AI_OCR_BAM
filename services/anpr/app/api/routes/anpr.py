@@ -10,15 +10,27 @@ from PIL import Image, UnidentifiedImageError
 from app.anpr.decision_engine import evaluate_plate
 from app.anpr.engine import RECEIVED_DIR, STREAM_DIR, TMP_DIR, get_engine
 from app.anpr.rag_module import answer_question
-from app.anpr.database import close_parking_session, fetch_alerts, fetch_logs, stats_snapshot, upsert_authorized_employee
+from app.anpr.database import (
+    close_parking_session,
+    delete_unknown_detections_by_plate,
+    fetch_alerts,
+    fetch_logs,
+    mark_manual_open,
+    stats_snapshot,
+    upsert_authorized_employee,
+    upsert_blacklisted_vehicle,
+)
 from app.schemas.anpr import (
     AskRequest,
     AskResponse,
     AuthorizedEmployeeRequest,
     AuthorizedEmployeeResponse,
+    BlacklistVehicleRequest,
+    BlacklistVehicleResponse,
     DetectDecision,
     DetectResponse,
     ExitResponse,
+    ManualOpenRequest,
 )
 
 router = APIRouter(tags=["anpr"])
@@ -232,6 +244,42 @@ def add_authorized_employee(payload: AuthorizedEmployeeRequest) -> AuthorizedEmp
     )
 
 
+@router.post("/anpr/blacklist", response_model=BlacklistVehicleResponse)
+def blacklist_vehicle(payload: BlacklistVehicleRequest) -> BlacklistVehicleResponse:
+    plate = payload.plate_number.strip()
+    reason = payload.reason.strip()
+    if not plate:
+        raise HTTPException(status_code=400, detail="plate_number is required")
+    if not reason:
+        raise HTTPException(status_code=400, detail="reason is required")
+    result = upsert_blacklisted_vehicle(
+        plate_number=plate,
+        reason=reason,
+        owner_name=payload.owner_name,
+        vehicle_type=payload.vehicle_type,
+        detected_at=datetime.now(),
+    )
+    delete_unknown_detections_by_plate(result["plate_number"])
+    return BlacklistVehicleResponse(
+        plate_number=result["plate_number"],
+        status="BLACKLISTED",
+        reason=reason,
+        vehicle_id=result["vehicle_id"],
+        blacklisted_at=result["blacklisted_at"],
+    )
+
+
+@router.post("/anpr/manual-open")
+def manual_open(payload: ManualOpenRequest) -> dict:
+    plate = payload.plate_number.strip()
+    if not plate:
+        raise HTTPException(status_code=400, detail="plate_number is required")
+    result = mark_manual_open(plate, datetime.now())
+    if not result["updated"]:
+        raise HTTPException(status_code=400, detail="No unknown/blacklisted open log found for this plate.")
+    return {"plate_number": plate, "log_id": result["log_id"], "opened": True}
+
+
 @router.get("/anpr/logs")
 def get_logs(limit: int = 50, plate_number: str | None = None, status: str | None = None) -> dict:
     logs = fetch_logs(limit=limit, plate_number=plate_number, status=status)
@@ -245,10 +293,6 @@ def get_logs(limit: int = 50, plate_number: str | None = None, status: str | Non
 @router.get("/anpr/alerts")
 def get_alerts(limit: int = 50) -> dict:
     alerts = fetch_alerts(limit=limit)
-    for row in alerts.get("blacklisted", []):
-        image_path = row.get("image_path")
-        if image_path:
-            row["image_url"] = f"/api/anpr/received/{Path(image_path).name}"
     for row in alerts.get("unknown", []):
         image_path = row.get("image_path")
         if image_path:

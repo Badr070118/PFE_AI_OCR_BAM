@@ -144,6 +144,13 @@ export default function SmartParkingPage() {
   const [question, setQuestion] = useState("");
   const [chat, setChat] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
+  const [blacklistReason, setBlacklistReason] = useState("");
+  const [blacklistError, setBlacklistError] = useState("");
+  const [blacklistLoading, setBlacklistLoading] = useState(false);
+  const [blacklistSuccess, setBlacklistSuccess] = useState("");
+  const [manualOverride, setManualOverride] = useState(false);
+  const [manualOpenLoading, setManualOpenLoading] = useState(false);
+  const [manualOpenError, setManualOpenError] = useState("");
 
   useEffect(() => {
     if (!file) {
@@ -154,6 +161,18 @@ export default function SmartParkingPage() {
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [file]);
+
+  useEffect(() => {
+    setBlacklistReason("");
+    setBlacklistError("");
+    setBlacklistSuccess("");
+    setBlacklistLoading(false);
+  }, [result?.plate_text, result?.timestamp]);
+
+  useEffect(() => {
+    setManualOpenError("");
+    setManualOpenLoading(false);
+  }, [result?.plate_text, result?.timestamp]);
 
   const loadLogs = async () => {
     const res = await fetch(`${API_PREFIX}/logs?limit=12`);
@@ -219,8 +238,149 @@ export default function SmartParkingPage() {
     }
   };
 
-  const gateState = result?.decision?.gate || "CLOSED";
-  const gateLabel = gateState === "OPEN" ? "Gate Opened" : "Gate Closed";
+  const submitBlacklist = async () => {
+    if (!result?.plate_text) {
+      setBlacklistError("Aucune plaque détectée.");
+      return;
+    }
+    const reason = blacklistReason.trim();
+    if (!reason) {
+      setBlacklistError("Veuillez saisir la cause du blacklist.");
+      return;
+    }
+    setBlacklistLoading(true);
+    setBlacklistError("");
+    setBlacklistSuccess("");
+    try {
+      const res = await fetch(`${API_PREFIX}/blacklist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plate_number: result.plate_text,
+          reason,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || "Blacklist failed.");
+      }
+      setBlacklistSuccess("Véhicule blacklisté avec succès.");
+      setResult((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          decision: {
+            ...prev.decision,
+            status: "BLACKLISTED",
+            action: "SECURITY ALERT",
+            reason,
+          },
+        };
+      });
+      await Promise.all([loadAlerts(), loadStats()]);
+    } catch (err) {
+      setBlacklistError(err.message || "Blacklist failed.");
+    } finally {
+      setBlacklistLoading(false);
+    }
+  };
+
+  const rawStatus = result?.decision?.status || "";
+  const normalizedStatus = rawStatus.toLowerCase();
+  const statusKey = loading
+    ? "processing"
+    : !result
+      ? "idle"
+      : normalizedStatus === "no_plate"
+        ? "unknown"
+        : normalizedStatus || "unknown";
+  const statusLabel = loading
+    ? "PROCESSING"
+    : !result
+      ? "IDLE"
+      : rawStatus.toUpperCase() === "NO_PLATE"
+        ? "UNKNOWN"
+        : rawStatus.toUpperCase() || "UNKNOWN";
+  const actionLabel = loading ? "Analyse en cours" : result?.decision?.action || "En attente de détection";
+  const reasonLabel = result?.decision?.reason
+    || (rawStatus.toUpperCase() === "NO_PLATE"
+      ? "Aucune plaque détectée"
+      : statusKey === "authorized"
+        ? "Accès autorisé"
+        : statusKey === "blacklisted"
+          ? "Véhicule blacklisté"
+          : statusKey === "denied"
+            ? "Accès refusé"
+            : statusKey === "unknown"
+              ? "Véhicule inconnu"
+              : statusKey === "processing"
+                ? "Analyse en cours"
+                : "-");
+  const gateOwner = result?.decision?.owner_name || "Unknown";
+  const gateDepartment = result?.decision?.vehicle_type || "N/A";
+  const gatePlate = result?.plate_text || "-";
+  const gateTimestamp = result?.timestamp ? formatTimestamp(result.timestamp) : "-";
+  const manualAllowed = statusKey === "unknown" || statusKey === "blacklisted";
+  const displayStatusKey = manualOverride ? "authorized" : statusKey;
+
+  const [gateOpen, setGateOpen] = useState(false);
+
+  useEffect(() => {
+    if (loading || !result) {
+      setGateOpen(false);
+      setManualOverride(false);
+      return undefined;
+    }
+    const decisionGate = result?.decision?.gate;
+    const status = result?.decision?.status || "";
+    if (manualOverride) {
+      setGateOpen(true);
+      const timer = window.setTimeout(() => {
+        setGateOpen(false);
+        setManualOverride(false);
+      }, 3500);
+      return () => window.clearTimeout(timer);
+    }
+    const shouldOpen = decisionGate === "OPEN" || status === "AUTHORIZED";
+    if (!shouldOpen) {
+      setGateOpen(false);
+      return undefined;
+    }
+    setGateOpen(true);
+    const timer = window.setTimeout(() => setGateOpen(false), 3500);
+    return () => window.clearTimeout(timer);
+  }, [loading, result?.decision?.status, result?.decision?.gate, result?.timestamp, manualOverride]);
+
+  useEffect(() => {
+    if (!manualAllowed) {
+      setManualOverride(false);
+    }
+  }, [manualAllowed, result?.timestamp]);
+
+  const handleManualOpen = () => {
+    if (!manualAllowed || loading) return;
+    const plate = result?.plate_text;
+    if (!plate) return;
+    setManualOpenLoading(true);
+    setManualOpenError("");
+    fetch(`${API_PREFIX}/manual-open`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plate_number: plate }),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.detail || "Manual open failed.");
+        }
+        setManualOverride(true);
+        await loadLogs();
+      })
+      .catch((err) => {
+        setManualOpenError(err.message || "Manual open failed.");
+      })
+      .finally(() => setManualOpenLoading(false));
+  };
 
   const parseAssistantRecords = (content) => {
     if (!content) return { header: "", records: [] };
@@ -489,18 +649,33 @@ export default function SmartParkingPage() {
         </section>
 
         <section className="panel parking-section gate">
-          <div className="panel-header">
-            <h2>Gate Status</h2>
-            <p>Simulation du portail en temps réel.</p>
+          <div className="panel-header gate-header">
+            <div>
+              <h2>Gate Status</h2>
+              <p>Simulation du portail en temps réel.</p>
+            </div>
+            <div className={`gate-status-dot ${displayStatusKey}`} />
           </div>
-          <div className={`parking-gate ${gateState === "OPEN" ? "open" : "closed"}`}>
-            <div className="parking-gate-arm" />
-            <div className="parking-gate-post" />
+          <div className={`gate-card status-${displayStatusKey} ${gateOpen ? "open" : "closed"}`}>
+            <div className="gate-visual">
+              <div className="gate-post" />
+              <div className="gate-arm" />
+              <div className="gate-base" />
+            </div>
           </div>
-          <div className="parking-gate-meta">
-            <strong>{gateLabel}</strong>
-            <span>{result?.decision?.action || "Awaiting detection"}</span>
-          </div>
+          {manualAllowed && (
+            <div className="gate-controls">
+              <button
+                type="button"
+                className="btn primary"
+                onClick={handleManualOpen}
+                disabled={manualOverride || loading || manualOpenLoading}
+              >
+                {manualOverride || manualOpenLoading ? "Ouverture en cours..." : "Ouvrir manuellement"}
+              </button>
+              {manualOpenError && <span className="state error">{manualOpenError}</span>}
+            </div>
+          )}
         </section>
 
         <section className="panel parking-section live">
@@ -541,6 +716,32 @@ export default function SmartParkingPage() {
                   <strong>{result.decision.action}</strong>
                 </div>
               </div>
+              {result.decision.status === "BLACKLISTED" && result.decision.reason && (
+                <p className="state">Raison du blacklist: {result.decision.reason}</p>
+              )}
+              {result.decision.status === "UNKNOWN" && (
+                <div className="blacklist-form">
+                  <label>
+                    <span>Cause du blacklist</span>
+                    <textarea
+                      rows="2"
+                      value={blacklistReason}
+                      onChange={(event) => setBlacklistReason(event.target.value)}
+                      placeholder="Ex: véhicule suspect, absence d'autorisation, comportement dangereux."
+                    />
+                  </label>
+                  {blacklistError && <p className="state error">{blacklistError}</p>}
+                  {blacklistSuccess && <p className="state success">{blacklistSuccess}</p>}
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={submitBlacklist}
+                    disabled={blacklistLoading}
+                  >
+                    {blacklistLoading ? "..." : "Blacklister ce véhicule"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -606,8 +807,16 @@ export default function SmartParkingPage() {
                   <tr key={item.id}>
                     <td>{formatPlateDisplay(item.plate_number)}</td>
                     <td>{item.status}</td>
-                    <td>{formatTimestamp(item.entry_time)}</td>
-                    <td>{formatTimestamp(item.exit_time)}</td>
+                    <td>
+                      {(item.status === "UNKNOWN" || item.status === "BLACKLISTED") && item.manual_opened === false
+                        ? "-"
+                        : formatTimestamp(item.entry_time)}
+                    </td>
+                    <td>
+                      {(item.status === "UNKNOWN" || item.status === "BLACKLISTED") && item.manual_opened === false
+                        ? "-"
+                        : formatTimestamp(item.exit_time)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -627,7 +836,8 @@ export default function SmartParkingPage() {
               {alerts.blacklisted.map((item) => (
                 <div key={`blk-${item.id}`} className="parking-alert-item">
                   <strong>{formatPlateDisplay(item.plate_number)}</strong>
-                  <span>{formatTimestamp(item.entry_time)}</span>
+                  <span>{item.blacklist_reason || "Raison non précisée"}</span>
+                  <span>{formatTimestamp(item.blacklisted_at || item.created_at)}</span>
                 </div>
               ))}
             </div>

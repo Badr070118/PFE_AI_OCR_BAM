@@ -62,3 +62,22 @@ class AuthorizedEmployeeResponse(BaseModel):
     authorized: bool
     vehicle_id: int
     employee_id: int
+
+
+class BlacklistVehicleRequest(BaseModel):
+    plate_number: str
+    reason: str
+    owner_name: str | None = None
+    vehicle_type: str | None = None
+
+
+class BlacklistVehicleResponse(BaseModel):
+    plate_number: str
+    status: str
+    reason: str
+    vehicle_id: int
+    blacklisted_at: datetime
+
+
+class ManualOpenRequest(BaseModel):
+    plate_number: str

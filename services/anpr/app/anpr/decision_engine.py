@@ -72,7 +72,7 @@ def evaluate_plate(plate_text: str, image_path: str | None, detected_at: datetim
             gate="CLOSED",
             owner_name=vehicle.get("owner_name"),
             vehicle_type=vehicle.get("vehicle_type"),
-            reason="Suspicious vehicle",
+            reason=vehicle.get("blacklist_reason") or "Suspicious vehicle",
             log_id=log["log_id"],
             event=log["event"],
             matched_plate=vehicle.get("plate_number"),
