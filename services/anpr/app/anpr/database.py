@@ -202,8 +202,16 @@ def log_detection(
         )
 
         if open_log:
-            if open_log.get("status") in {"UNKNOWN", "BLACKLISTED"}:
-                return {"log_id": int(open_log["id"]), "event": "exit_pending"}
+            open_status = open_log.get("status")
+            if open_status in {"UNKNOWN", "BLACKLISTED"}:
+                if status in {"UNKNOWN", "BLACKLISTED"}:
+                    return {"log_id": int(open_log["id"]), "event": "exit_pending"}
+                connection.execute(
+                    update(parking_logs)
+                    .where(parking_logs.c.id == open_log["id"])
+                    .values(exit_time=detected_at, status=status)
+                )
+                return {"log_id": int(open_log["id"]), "event": "exit"}
             connection.execute(
                 update(parking_logs)
                 .where(parking_logs.c.id == open_log["id"])

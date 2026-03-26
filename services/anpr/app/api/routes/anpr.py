@@ -234,6 +234,7 @@ def add_authorized_employee(payload: AuthorizedEmployeeRequest) -> AuthorizedEmp
         is_authorized=payload.is_authorized,
         employee_code=payload.employee_code,
     )
+    delete_unknown_detections_by_plate(payload.plate_number)
     return AuthorizedEmployeeResponse(
         full_name=payload.full_name,
         department=payload.department,

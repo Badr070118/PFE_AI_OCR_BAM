@@ -151,6 +151,13 @@ export default function SmartParkingPage() {
   const [manualOverride, setManualOverride] = useState(false);
   const [manualOpenLoading, setManualOpenLoading] = useState(false);
   const [manualOpenError, setManualOpenError] = useState("");
+  const [assignName, setAssignName] = useState("");
+  const [assignDepartment, setAssignDepartment] = useState("");
+  const [assignCode, setAssignCode] = useState("");
+  const [assignPlate, setAssignPlate] = useState("");
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignError, setAssignError] = useState("");
+  const [assignSuccess, setAssignSuccess] = useState("");
 
   useEffect(() => {
     if (!file) {
@@ -167,6 +174,13 @@ export default function SmartParkingPage() {
     setBlacklistError("");
     setBlacklistSuccess("");
     setBlacklistLoading(false);
+    setAssignError("");
+    setAssignSuccess("");
+    setAssignLoading(false);
+    setAssignName("");
+    setAssignDepartment("");
+    setAssignCode("");
+    setAssignPlate(result?.plate_text || "");
   }, [result?.plate_text, result?.timestamp]);
 
   useEffect(() => {
@@ -381,6 +395,42 @@ export default function SmartParkingPage() {
         setManualOpenError(err.message || "Manual open failed.");
       })
       .finally(() => setManualOpenLoading(false));
+  };
+
+  const submitAssignment = async () => {
+    const fullName = assignName.trim();
+    const department = assignDepartment.trim();
+    const plateNumber = assignPlate.trim() || result?.plate_text;
+    if (!fullName || !department || !plateNumber) {
+      setAssignError("Veuillez renseigner le nom, le département et la plaque.");
+      return;
+    }
+    setAssignLoading(true);
+    setAssignError("");
+    setAssignSuccess("");
+    try {
+      const res = await fetch(`${API_PREFIX}/authorized`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: fullName,
+          department,
+          plate_number: plateNumber,
+          employee_code: assignCode.trim() || undefined,
+          is_authorized: true,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || "Affectation impossible.");
+      }
+      setAssignSuccess("Employé ajouté. La plaque est maintenant autorisée.");
+      await Promise.all([loadAlerts(), loadStats()]);
+    } catch (err) {
+      setAssignError(err.message || "Affectation impossible.");
+    } finally {
+      setAssignLoading(false);
+    }
   };
 
   const parseAssistantRecords = (content) => {
@@ -721,26 +771,78 @@ export default function SmartParkingPage() {
                 <p className="state">Raison du blacklist: {result.decision.reason}</p>
               )}
               {result.decision.status === "UNKNOWN" && (
-                <div className="blacklist-form">
-                  <label>
-                    <span>Cause du blacklist</span>
-                    <textarea
-                      rows="2"
-                      value={blacklistReason}
-                      onChange={(event) => setBlacklistReason(event.target.value)}
-                      placeholder="Ex: véhicule suspect, absence d'autorisation, comportement dangereux."
-                    />
-                  </label>
-                  {blacklistError && <p className="state error">{blacklistError}</p>}
-                  {blacklistSuccess && <p className="state success">{blacklistSuccess}</p>}
-                  <button
-                    type="button"
-                    className="btn primary"
-                    onClick={submitBlacklist}
-                    disabled={blacklistLoading}
-                  >
-                    {blacklistLoading ? "..." : "Blacklister ce véhicule"}
-                  </button>
+                <div className="unknown-actions">
+                  <div className="blacklist-form">
+                    <label>
+                      <span>Cause du blacklist</span>
+                      <textarea
+                        rows="2"
+                        value={blacklistReason}
+                        onChange={(event) => setBlacklistReason(event.target.value)}
+                        placeholder="Ex: véhicule suspect, absence d'autorisation, comportement dangereux."
+                      />
+                    </label>
+                    {blacklistError && <p className="state error">{blacklistError}</p>}
+                    {blacklistSuccess && <p className="state success">{blacklistSuccess}</p>}
+                    <button
+                      type="button"
+                      className="btn primary"
+                      onClick={submitBlacklist}
+                      disabled={blacklistLoading}
+                    >
+                      {blacklistLoading ? "..." : "Blacklister ce véhicule"}
+                    </button>
+                  </div>
+
+                  <div className="assign-form">
+                    <h4>Assigner à un employé (optionnel)</h4>
+                    <label>
+                      <span>Nom complet</span>
+                      <input
+                        type="text"
+                        value={assignName}
+                        onChange={(event) => setAssignName(event.target.value)}
+                        placeholder="Ex: Salma Bennani"
+                      />
+                    </label>
+                    <label>
+                      <span>Département</span>
+                      <input
+                        type="text"
+                        value={assignDepartment}
+                        onChange={(event) => setAssignDepartment(event.target.value)}
+                        placeholder="Ex: DSI"
+                      />
+                    </label>
+                    <label>
+                      <span>Code employé (optionnel)</span>
+                      <input
+                        type="text"
+                        value={assignCode}
+                        onChange={(event) => setAssignCode(event.target.value)}
+                        placeholder="Ex: EMP-102"
+                      />
+                    </label>
+                    <label>
+                      <span>Plaque</span>
+                      <input
+                        type="text"
+                        value={assignPlate}
+                        onChange={(event) => setAssignPlate(event.target.value)}
+                        placeholder="Ex: 38119 - و - 1"
+                      />
+                    </label>
+                    {assignError && <p className="state error">{assignError}</p>}
+                    {assignSuccess && <p className="state success">{assignSuccess}</p>}
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      onClick={submitAssignment}
+                      disabled={assignLoading}
+                    >
+                      {assignLoading ? "..." : "Affecter la plaque"}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

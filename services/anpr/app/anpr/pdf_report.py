@@ -5,11 +5,12 @@ from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 def _fmt_date(value: date | datetime | None) -> str:
@@ -64,7 +65,43 @@ def build_presence_pdf(report: dict, output_path: Path) -> None:
     styles = getSampleStyleSheet()
     base_font, bold_font = _register_unicode_fonts()
     styles["Normal"].fontName = base_font
-    styles.add(ParagraphStyle(name="TitleLarge", fontName=bold_font, fontSize=18, leading=22, spaceAfter=10))
+    styles.add(
+        ParagraphStyle(
+            name="TitleLarge",
+            fontName=bold_font,
+            fontSize=18,
+            leading=22,
+            spaceAfter=8,
+            alignment=TA_CENTER,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="Brand",
+            fontName=bold_font,
+            fontSize=14,
+            leading=18,
+            alignment=TA_CENTER,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="BrandRight",
+            fontName=base_font,
+            fontSize=9,
+            leading=12,
+            alignment=TA_RIGHT,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="MetaCenter",
+            fontName=base_font,
+            fontSize=9,
+            leading=12,
+            alignment=TA_CENTER,
+        )
+    )
     styles.add(
         ParagraphStyle(
             name="SectionTitle",
@@ -89,15 +126,42 @@ def build_presence_pdf(report: dict, output_path: Path) -> None:
     accesses = report.get("accesses", []) or []
 
     story: list = []
-    story.append(Paragraph("Rapport de presence", styles["TitleLarge"]))
-    story.append(Paragraph(f"Type: {_report_type_label(report.get('report_type', ''))}", styles["Normal"]))
+
+    logo_path = Path(__file__).resolve().parent.parent / "assets" / "logo_bam.png"
+    logo = None
+    if logo_path.exists():
+        logo = Image(str(logo_path), width=2.4 * cm, height=2.4 * cm)
+        logo.hAlign = "LEFT"
+
+    brand_block = Paragraph("Bank Al-Maghrib", styles["Brand"])
+    right_block = Paragraph("Bank Al-Maghrib \u2013 Rapport de pr\u00e9sence", styles["BrandRight"])
+    title_block = Paragraph("Rapport de presence", styles["TitleLarge"])
+    header_rows = [[logo or "", brand_block, right_block]]
+    header_table = Table(header_rows, colWidths=[2.8 * cm, 9.4 * cm, 4.8 * cm])
+    header_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (1, 0), (1, 0), "CENTER"),
+                ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    story.append(header_table)
+    story.append(Spacer(1, 6))
+    story.append(title_block)
+    story.append(Paragraph(f"Type: {_report_type_label(report.get('report_type', ''))}", styles["MetaCenter"]))
     story.append(
         Paragraph(
             f"Periode: {_fmt_date(report.get('start_date'))} au {_fmt_date(report.get('end_date'))}",
-            styles["Normal"],
+            styles["MetaCenter"],
         )
     )
-    story.append(Paragraph(f"Genere le: {_fmt_datetime(report.get('generated_at'))}", styles["Normal"]))
+    story.append(Paragraph(f"Genere le: {_fmt_datetime(report.get('generated_at'))}", styles["MetaCenter"]))
     story.append(Spacer(1, 12))
 
     story.append(Paragraph("Derniers acces", styles["SectionTitle"]))

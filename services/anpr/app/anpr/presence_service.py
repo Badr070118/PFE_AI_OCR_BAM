@@ -97,6 +97,8 @@ def getPresenceOverviewDashboard(target_date: date | None = None) -> dict[str, A
     logs = fetch_parking_logs_range(start_dt, end_dt)
     logs.sort(key=lambda item: item.get("entry_time") or datetime.min, reverse=True)
     recent = []
+    legacy_statuses = {"UNKNOWN", "BLACKLISTED"}
+    latest_legacy_by_plate: set[str] = set()
 
     present_plates: set[str] = set()
     first_entry_by_plate: dict[str, datetime] = {}
@@ -111,8 +113,14 @@ def getPresenceOverviewDashboard(target_date: date | None = None) -> dict[str, A
         )
         if not entry:
             continue
+        status = log.get("status")
+        canonical_plate = entry.get("plate_number") or plate
+        if status in legacy_statuses:
+            if canonical_plate in latest_legacy_by_plate:
+                continue
+            latest_legacy_by_plate.add(canonical_plate)
+            log = {**log, "status": "AUTHORIZED"}
         recent.append(log)
-        canonical_plate = entry.get("plate_number")
         if not canonical_plate:
             continue
         present_plates.add(canonical_plate)
