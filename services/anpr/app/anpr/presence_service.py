@@ -10,7 +10,7 @@ from app.anpr.database import (
     fetch_unknown_detections_range,
     fetch_vehicles,
 )
-from app.anpr.reporting_service import detectRealAnomaliesFromLogs, _build_presence_config
+from app.anpr.reporting_service import _build_presence_config
 from app.anpr.plate_utils import normalize_plate, plate_loose_key
 
 
@@ -146,13 +146,8 @@ def getPresenceOverviewDashboard(target_date: date | None = None) -> dict[str, A
 
     late_count = sum(1 for ts in first_entry_by_plate.values() if ts > late_threshold)
 
-    anomaly_result = detectRealAnomaliesFromLogs(
-        logs,
-        options={"employees_by_plate": directory, "config": config},
-    )
-    anomalies = anomaly_result.get("anomalies", {})
-
     unknown_detections = fetch_unknown_detections_range(start_dt, end_dt)
+    unknown_plates: list[dict[str, Any]] = []
     for item in unknown_detections:
         plate = item.get("plate_number")
         if not plate:
@@ -163,11 +158,8 @@ def getPresenceOverviewDashboard(target_date: date | None = None) -> dict[str, A
             or directory_lookup.get(plate_loose_key(plate))
         ):
             continue
-        anomalies.setdefault("unknown_plates", []).append(
-            {"plate_number": plate, "detected_at": item.get("detected_at")}
-        )
+        unknown_plates.append({"plate_number": plate, "detected_at": item.get("detected_at")})
 
-    total_anomalies = sum(len(items) for items in anomalies.values())
     total_employees = len(directory)
     employees_present = len(present_plates)
     employees_absent = max(total_employees - employees_present, 0)
@@ -177,13 +169,7 @@ def getPresenceOverviewDashboard(target_date: date | None = None) -> dict[str, A
         "employees_present": employees_present,
         "employees_absent": employees_absent,
         "total_late": late_count,
-        "total_anomalies": total_anomalies,
-        "unknown_plates": len(anomalies.get("unknown_plates", [])),
-        "blacklisted": len(anomalies.get("blacklisted", [])),
-        "entry_without_exit": len(anomalies.get("entry_without_exit", [])),
-        "orphan_exit": len(anomalies.get("orphan_exit", [])),
-        "duplicates": len(anomalies.get("duplicates", [])),
-        "incoherent": len(anomalies.get("incoherent", [])),
+        "unknown_plates": len(unknown_plates),
     }
 
     recent = _attach_employee_meta(recent, directory_lookup)
@@ -195,71 +181,4 @@ def getPresenceOverviewDashboard(target_date: date | None = None) -> dict[str, A
     }
 
 
-def _flatten_anomalies(anomalies: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    items: list[dict[str, Any]] = []
-    for anomaly_type, entries in anomalies.items():
-        for entry in entries:
-            timestamp = entry.get("entry_time") or entry.get("exit_time") or entry.get("detected_at")
-            items.append(
-                {
-                    "type": anomaly_type,
-                    "plate_number": entry.get("plate_number"),
-                    "status": entry.get("status"),
-                    "timestamp": timestamp,
-                    "details": entry,
-                }
-            )
-    items.sort(key=lambda item: item.get("timestamp") or datetime.min, reverse=True)
-    return items
-
-
-def getRealAnomalies(start_date: date | None = None, end_date: date | None = None) -> dict[str, Any]:
-    today = datetime.now().date()
-    start_date = start_date or today
-    end_date = end_date or start_date
-
-    if start_date > end_date:
-        start_date, end_date = end_date, start_date
-
-    start_dt = datetime.combine(start_date, time.min)
-    end_dt = datetime.combine(end_date + timedelta(days=1), time.min)
-
-    directory = _build_directory()
-    directory_lookup = _directory_lookup(directory)
-    logs = fetch_parking_logs_range(start_dt, end_dt)
-    anomaly_result = detectRealAnomaliesFromLogs(
-        logs,
-        options={
-            "employees_by_plate": directory,
-            "config": _build_presence_config(),
-        },
-    )
-    anomalies = anomaly_result.get("anomalies", {})
-
-    unknown_detections = fetch_unknown_detections_range(start_dt, end_dt)
-    for item in unknown_detections:
-        plate = item.get("plate_number")
-        if not plate:
-            continue
-        if (
-            directory_lookup.get(plate)
-            or directory_lookup.get(normalize_plate(plate))
-            or directory_lookup.get(plate_loose_key(plate))
-        ):
-            continue
-        anomalies.setdefault("unknown_plates", []).append(
-            {"plate_number": plate, "detected_at": item.get("detected_at")}
-        )
-
-    summary = {key: len(items) for key, items in anomalies.items()}
-    items = _flatten_anomalies(anomalies)
-
-    return {
-        "start_date": start_date,
-        "end_date": end_date,
-        "summary": summary,
-        "items": items,
-    }
-
-
-__all__ = ["getPresenceOverviewDashboard", "getRealAnomalies", "_parse_date"]
+__all__ = ["getPresenceOverviewDashboard", "_parse_date"]

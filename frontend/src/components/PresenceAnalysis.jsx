@@ -5,7 +5,6 @@ const TABS = [
   { id: "overview", label: "Vue d’ensemble" },
   { id: "reports", label: "Rapports" },
   { id: "history", label: "Historique" },
-  { id: "anomalies", label: "Anomalies" },
 ];
 
 const REPORT_TYPES = [
@@ -14,15 +13,6 @@ const REPORT_TYPES = [
   { value: "monthly", label: "Mensuel" },
   { value: "yearly", label: "Annuel" },
 ];
-
-const ANOMALY_LABELS = {
-  entry_without_exit: "Entrée sans sortie",
-  incoherent: "Événements incohérents",
-  duplicates: "Doublons rapprochés",
-  unknown_plates: "Plaques inconnues",
-  blacklisted: "Plaques blacklistées",
-  orphan_exit: "Sortie sans entrée",
-};
 
 const formatTimestamp = (value) => {
   if (!value) return "-";
@@ -62,11 +52,6 @@ export default function PresenceAnalysis({ apiPrefix }) {
 
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-
-  const [anomalyStart, setAnomalyStart] = useState(todayIso);
-  const [anomalyEnd, setAnomalyEnd] = useState(todayIso);
-  const [anomalies, setAnomalies] = useState(null);
-  const [anomalyLoading, setAnomalyLoading] = useState(false);
 
   const buildReportPayload = () => {
     setReportError("");
@@ -149,22 +134,6 @@ export default function PresenceAnalysis({ apiPrefix }) {
     }
   };
 
-  const fetchAnomalies = async () => {
-    setAnomalyLoading(true);
-    try {
-      const res = await fetch(
-        `${apiPrefix}/presence/anomalies?start_date=${anomalyStart}&end_date=${anomalyEnd}`
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "Impossible de charger les anomalies.");
-      setAnomalies(data);
-    } catch (err) {
-      setAnomalies({ error: err.message || "Erreur anomalies." });
-    } finally {
-      setAnomalyLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (activeTab !== "overview") return undefined;
     fetchOverview();
@@ -178,17 +147,12 @@ export default function PresenceAnalysis({ apiPrefix }) {
     }
   }, [activeTab]);
 
-  useEffect(() => {
-    if (activeTab === "anomalies") {
-      fetchAnomalies();
-    }
-  }, [activeTab, anomalyStart, anomalyEnd]);
   return (
     <section className="presence-analysis">
       <header className="presence-analysis-head">
         <div>
           <h2>Analyse de présence</h2>
-          <p>Module basé uniquement sur les données réelles (employés + logs ANPR + anomalies).</p>
+          <p>Module basé uniquement sur les données réelles (employés + logs ANPR).</p>
         </div>
         <div className="presence-analysis-meta">
           <span>Sources: employees, parking_logs, unknown_detections</span>
@@ -233,10 +197,6 @@ export default function PresenceAnalysis({ apiPrefix }) {
                 <div>
                   <span>Retards</span>
                   <strong>{overview.summary?.total_late ?? 0}</strong>
-                </div>
-                <div>
-                  <span>Anomalies</span>
-                  <strong>{overview.summary?.total_anomalies ?? 0}</strong>
                 </div>
                 <div>
                   <span>Plaques inconnues</span>
@@ -403,63 +363,7 @@ export default function PresenceAnalysis({ apiPrefix }) {
         </div>
       )}
 
-      {activeTab === "anomalies" && (
-        <div className="presence-panel">
-          <div className="presence-card">
-            <h3>Filtres</h3>
-            <div className="presence-inline">
-              <label>
-                <span>Date début</span>
-                <input type="date" value={anomalyStart} onChange={(event) => setAnomalyStart(event.target.value)} />
-              </label>
-              <label>
-                <span>Date fin</span>
-                <input type="date" value={anomalyEnd} onChange={(event) => setAnomalyEnd(event.target.value)} />
-              </label>
-            </div>
-          </div>
-
-          <div className="presence-card presence-anomalies-tab">
-            <h3>Anomalies réelles</h3>
-            {anomalyLoading && <p className="state">Chargement...</p>}
-            {!anomalyLoading && anomalies?.error && <p className="state error">{anomalies.error}</p>}
-            {!anomalyLoading && anomalies && !anomalies.error && (
-              <>
-                <div className="presence-metrics">
-                  {Object.entries(anomalies.summary || {}).map(([key, value]) => (
-                    <div key={key}>
-                      <span>{ANOMALY_LABELS[key] || key}</span>
-                      <strong>{value}</strong>
-                    </div>
-                  ))}
-                </div>
-
-                {anomalies.items?.length === 0 && (
-                  <p className="state">Aucune anomalie détectée pour cette période.</p>
-                )}
-                {anomalies.items?.length > 0 && (
-                  <div className="presence-table">
-                    <div className="presence-table-head">
-                      <span>Type</span>
-                      <span>Plaque</span>
-                      <span>Horodatage</span>
-                      <span>Statut</span>
-                    </div>
-                    {anomalies.items.slice(0, 20).map((item, index) => (
-                      <div key={`${item.type}-${index}`} className="presence-table-row">
-                        <span>{ANOMALY_LABELS[item.type] || item.type}</span>
-                        <span>{formatPlateDisplay(item.plate_number || "-")}</span>
-                        <span>{formatTimestamp(item.timestamp)}</span>
-                        <span>{item.status || "-"}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      
     </section>
   );
 }

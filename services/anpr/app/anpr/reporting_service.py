@@ -158,6 +158,31 @@ def detectRealAnomaliesFromLogs(logs: list[dict], options: dict | None = None) -
     employees_by_plate: dict[str, dict] = options.get("employees_by_plate") or {}
     config: PresenceConfig = options.get("config") or _build_presence_config()
 
+    known_keys: set[str] = set()
+    for key in employees_by_plate.keys():
+        if not key:
+            continue
+        known_keys.add(key)
+        normalized = normalize_plate(key)
+        if normalized:
+            known_keys.add(normalized)
+        loose_key = plate_loose_key(key)
+        if loose_key:
+            known_keys.add(loose_key)
+
+    def _is_known_plate(plate: str | None) -> bool:
+        if not plate:
+            return False
+        if plate in known_keys:
+            return True
+        normalized = normalize_plate(plate)
+        if normalized and normalized in known_keys:
+            return True
+        loose_key = plate_loose_key(plate)
+        if loose_key and loose_key in known_keys:
+            return True
+        return False
+
     anomalies: dict[str, list[dict]] = {
         "entry_without_exit": [],
         "incoherent": [],
@@ -192,7 +217,7 @@ def detectRealAnomaliesFromLogs(logs: list[dict], options: dict | None = None) -
         if not plate or entry_time is None:
             continue
 
-        if plate not in employees_by_plate:
+        if not _is_known_plate(plate):
             anomalies["unknown_plates"].append(
                 {
                     "plate_number": plate,
