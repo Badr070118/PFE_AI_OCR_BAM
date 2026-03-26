@@ -78,6 +78,7 @@ const buildQuickSpecs = () => {
     { label: "Entrée", key: "entry_time", format: formatTimestamp },
   ]);
   add(QUICK_QUESTIONS[2], [
+    { label: "Employe", key: "employee_name" },
     { label: "Plaque", key: "plate_number" },
     { label: "Entrée", key: "entry_time", format: formatTimestamp },
     { label: "Statut", key: "status", badge: true },
@@ -88,6 +89,7 @@ const buildQuickSpecs = () => {
     { label: "Département", key: "department" },
   ]);
   add(QUICK_QUESTIONS[4], [
+    { label: "Employe", key: "employee_name" },
     { label: "Plaque", key: "plate_number" },
     { label: "Entrée", key: "entry_time", format: formatTimestamp },
     { label: "Sortie", key: "exit_time", format: formatTimestamp },
@@ -99,15 +101,18 @@ const buildQuickSpecs = () => {
     { label: "Entrée", key: "entry_time", format: formatTimestamp },
   ]);
   add(QUICK_QUESTIONS[6], [
+    { label: "Employe", key: "employee_name" },
     { label: "Plaque", key: "plate_number" },
     { label: "Détection", key: "detected_at", format: formatTimestamp },
   ]);
   add(QUICK_QUESTIONS[7], [
+    { label: "Employe", key: "employee_name" },
     { label: "Plaque", key: "plate_number" },
     { label: "Entrée", key: "entry_time", format: formatTimestamp },
     { label: "Statut", key: "status", badge: true },
   ]);
   add(QUICK_QUESTIONS[8], [
+    { label: "Employe", key: "employee_name" },
     { label: "Plaque", key: "plate_number" },
     { label: "Entrée", key: "entry_time", format: formatTimestamp },
     { label: "Sortie", key: "exit_time", format: formatTimestamp },
@@ -117,6 +122,18 @@ const buildQuickSpecs = () => {
     { label: "Employé", key: "employee_name" },
     { label: "Plaque", key: "plate_number" },
     { label: "Temps (min)", key: "total_minutes", numeric: true },
+  ]);
+
+  add(QUICK_QUESTIONS[10], [
+    { label: "Employe", key: "full_name" },
+    { label: "Plaque", key: "plate_number" },
+    { label: "Departement", key: "department" },
+  ]);
+  add(QUICK_QUESTIONS[11], [
+    { label: "Employe", key: "employee_name" },
+    { label: "Plaque", key: "plate_number" },
+    { label: "Entree", key: "entry_time", format: formatTimestamp },
+    { label: "Statut", key: "status", badge: true },
   ]);
 
   return specs;
@@ -465,7 +482,12 @@ export default function SmartParkingPage() {
     if (!content) return null;
     const rows = meta?.rows || [];
     const questionText = meta?.question || "";
+    const intent = meta?.intent || "";
     const quickSpec = QUICK_SPECS.get(normalizeQuestion(questionText));
+
+    if (intent === "plate_owner" || intent === "plate_auth_status" || intent === "employee_info") {
+      return <p>{content}</p>;
+    }
 
     if (rows.length > 0 && quickSpec) {
       const resolvedRows = rows.map((row) => {
@@ -616,7 +638,11 @@ export default function SmartParkingPage() {
         {
           role: "assistant",
           content: data.answer || "No answer generated.",
-          meta: { question: trimmed, rows: Array.isArray(data.rows) ? data.rows : [] },
+          meta: {
+            question: trimmed,
+            rows: Array.isArray(data.rows) ? data.rows : [],
+            intent: data.intent || "",
+          },
         },
       ]);
     } catch (err) {

@@ -7,7 +7,7 @@ from app.anpr.rag.intent_router import Intent
 
 def _format_list(prefix: str, rows: list[dict[str, Any]], line_builder) -> str:
     if not rows:
-        return "Aucune donnée trouvée pour cette question."
+        return "Aucune donnee trouvee pour cette question."
     lines = []
     for row in rows[:10]:
         lines.append(line_builder(row))
@@ -21,7 +21,7 @@ def format_answer(
     metadata: dict[str, Any] | None = None,
 ) -> str:
     if not rows:
-        return "Aucune donnée trouvée pour cette question."
+        return "Aucune donnee trouvee pour cette question."
 
     if intent == Intent.PLATE_OWNER:
         row = rows[0]
@@ -130,7 +130,7 @@ def format_answer(
         plate = row.get("plate_number") or "-"
         return f"{name} ({dept}) — plaque {plate}."
 
-    return "Aucune donnée trouvée pour cette question."
+    return "Aucune donnee trouvee pour cette question."
 
 
 __all__ = ["format_answer"]

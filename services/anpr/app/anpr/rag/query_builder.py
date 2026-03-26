@@ -29,11 +29,17 @@ def _date_range_clause(column: str, start_param: str, end_param: str) -> str:
 
 
 def _time_between_clause(column: str, start_param: str, end_param: str) -> str:
-    return f"TIME({column}) BETWEEN :{start_param} AND :{end_param}"
+    return f"{_time_expr(column)} BETWEEN :{start_param} AND :{end_param}"
 
 
 def _time_equals_clause(column: str, param: str) -> str:
-    return f"TIME({column}) = :{param}"
+    return f"{_time_expr(column)} = :{param}"
+
+
+def _time_expr(column: str) -> str:
+    if IS_SQLITE:
+        return f"TIME({column})"
+    return f"CAST({column} AS time)"
 
 
 def _duration_minutes_expr() -> str:
@@ -120,7 +126,7 @@ def build_query_for_late_today(target_date: date, cutoff_time: str) -> QuerySpec
         "LEFT JOIN employees e ON e.plate_number = p.plate_number "
         f"WHERE {_date_clause('p.entry_time', 'target_date')} "
         "AND p.status = 'AUTHORIZED' "
-        "AND TIME(p.entry_time) > :cutoff_time "
+        f"AND {_time_expr('p.entry_time')} > :cutoff_time "
         "ORDER BY p.entry_time DESC"
     )
     return QuerySpec(

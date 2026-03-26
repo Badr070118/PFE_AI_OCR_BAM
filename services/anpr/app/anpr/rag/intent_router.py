@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
+import unicodedata
 from enum import Enum
 
 from app.anpr.rag.entity_extractor import Entities
@@ -40,18 +42,32 @@ class IntentResult:
     reason: str
 
 
+def _normalize_intent_text(text: str) -> str:
+    if not text:
+        return ""
+    base = unicodedata.normalize("NFKC", text)
+    base = "".join(ch for ch in base if unicodedata.category(ch) != "Cf")
+    base = unicodedata.normalize("NFKD", base)
+    base = "".join(ch for ch in base if unicodedata.category(ch) != "Mn")
+    base = base.replace("\u00e2\u20ac\u2122", "'")
+    base = base.replace("\u2019", "'").replace("\u2018", "'")
+    base = base.replace("`", "'")
+    base = re.sub(r"\s+", " ", base)
+    return base.lower().strip()
+
+
 def detect_intent(question: str, entities: Entities) -> IntentResult:
-    text = question.lower().strip()
+    text = _normalize_intent_text(question)
     reason = "keywords"
 
     if entities.plate_normalized:
         if any(token in text for token in ["historique", "logs", "journal"]):
             return IntentResult(Intent.PLATE_HISTORY, 0.9, "plate + historique")
-        if any(token in text for token in ["derniere", "dernière", "last"]):
+        if any(token in text for token in ["derniere", "last"]):
             return IntentResult(Intent.PLATE_LAST_ENTRY, 0.85, "plate + dernier")
-        if any(token in text for token in ["autorise", "autorisé", "statut"]):
+        if any(token in text for token in ["autorise", "statut"]):
             return IntentResult(Intent.PLATE_AUTH_STATUS, 0.85, "plate + statut")
-        if any(token in text for token in ["appartient", "proprietaire", "propriétaire", "owner", "qui a"]):
+        if any(token in text for token in ["appartient", "proprietaire", "owner", "qui a"]):
             return IntentResult(Intent.PLATE_OWNER, 0.9, "plate + owner")
         return IntentResult(Intent.PLATE_OWNER, 0.7, "plate default")
 
@@ -60,17 +76,17 @@ def detect_intent(question: str, entities: Entities) -> IntentResult:
             return IntentResult(Intent.EMPLOYEE_HISTORY, 0.85, "employee + historique")
         if "retard" in text:
             return IntentResult(Intent.EMPLOYEE_LATE, 0.8, "employee + retard")
-        if "present" in text or "présent" in text:
+        if "present" in text:
             return IntentResult(Intent.EMPLOYEE_PRESENCE, 0.75, "employee + presence")
         return IntentResult(Intent.EMPLOYEE_INFO, 0.7, "employee default")
 
-    if any(token in text for token in ["10 derniers", "dix derniers", "derniers acces", "derniers accès"]):
+    if any(token in text for token in ["10 derniers", "dix derniers", "derniers acces"]):
         return IntentResult(Intent.LAST_N_ACCESS, 0.7, reason)
 
     if any(token in text for token in ["entre", "de "]) and entities.time_range:
         return IntentResult(Intent.ACCESS_BETWEEN_TIMES, 0.7, "time range")
 
-    if entities.time_value and any(token in text for token in ["entre", "entré", "entree", "access", "acces"]):
+    if entities.time_value and any(token in text for token in ["entre", "entree", "access", "acces", "present", "presence", "arrive"]):
         return IntentResult(Intent.ACCESS_AT_TIME, 0.65, "time value")
 
     if "retard" in text:
@@ -80,15 +96,15 @@ def detect_intent(question: str, entities: Entities) -> IntentResult:
         return IntentResult(Intent.ABSENT_TODAY, 0.7, reason)
 
     if any(token in text for token in ["actuellement", "en ce moment"]):
-        if "present" in text or "présent" in text:
+        if "present" in text:
             return IntentResult(Intent.CURRENTLY_PRESENT, 0.7, reason)
 
-    if "present" in text or "présent" in text:
-        if entities.department or "departement" in text or "département" in text:
+    if "present" in text:
+        if entities.department or "departement" in text:
             return IntentResult(Intent.DEPT_PRESENT_TODAY, 0.75, "department present")
         return IntentResult(Intent.PRESENT_TODAY, 0.65, reason)
 
-    if any(token in text for token in ["refus", "refuse", "blacklist"]):
+    if any(token in text for token in ["refus", "refuse", "refusee", "refusees", "blacklist"]):
         if any(token in text for token in ["combien", "nombre"]):
             return IntentResult(Intent.COUNT_DENIED_TODAY, 0.75, "count denied")
         return IntentResult(Intent.DENIED_TODAY, 0.7, reason)
@@ -102,10 +118,10 @@ def detect_intent(question: str, entities: Entities) -> IntentResult:
     if any(token in text for token in ["scan", "doublon", "rapproch"]):
         return IntentResult(Intent.MULTI_SCANS, 0.65, reason)
 
-    if any(token in text for token in ["plus souvent", "plus detect", "plus detecte", "plus détectée"]):
+    if any(token in text for token in ["plus souvent", "plus detect", "plus detecte", "plus detectee"]):
         return IntentResult(Intent.MOST_DETECTED_PLATE, 0.65, reason)
 
-    if any(token in text for token in ["plus de temps", "cumule", "cumulé"]):
+    if any(token in text for token in ["plus de temps", "cumule", "cumulee"]):
         return IntentResult(Intent.TOP_PRESENCE_TIME, 0.6, reason)
 
     return IntentResult(Intent.UNKNOWN, 0.2, "no match")

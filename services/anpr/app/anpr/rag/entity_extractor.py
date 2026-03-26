@@ -9,6 +9,10 @@ from typing import Iterable
 from app.anpr.plate_utils import normalize_plate
 
 
+ARABIC_LETTER_RANGE = r"\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF"
+PLATE_SEP = r"[-\u2010\u2011\u2012\u2013\u2014\u2015\u2212]"
+
+
 @dataclass
 class Entities:
     plate_raw: str | None = None
@@ -25,9 +29,12 @@ class Entities:
 def _normalize_text(text: str) -> str:
     if not text:
         return ""
-    base = unicodedata.normalize("NFKD", text)
+    base = unicodedata.normalize("NFKC", text)
+    base = "".join(ch for ch in base if unicodedata.category(ch) != "Cf")
+    base = unicodedata.normalize("NFKD", base)
     base = "".join(ch for ch in base if unicodedata.category(ch) != "Mn")
-    base = base.replace("’", "'")
+    base = base.replace("\u00e2\u20ac\u2122", "'")
+    base = base.replace("\u2019", "'").replace("\u2018", "'")
     base = base.replace("`", "'")
     base = re.sub(r"\s+", " ", base)
     return base.lower().strip()
@@ -67,13 +74,17 @@ def _year_range(today: date) -> tuple[date, date]:
 def extract_plate(question: str) -> tuple[str | None, str | None]:
     if not question:
         return None, None
+    cleaned = unicodedata.normalize("NFKC", question)
+    cleaned = "".join(ch for ch in cleaned if unicodedata.category(ch) != "Cf")
+    cleaned = cleaned.replace("|", "-")
+    cleaned = re.sub(rf"{PLATE_SEP}+", "-", cleaned)
     patterns = [
-        r"(\d{3,6}\s*[-–]\s*[\u0600-\u06FF]\s*[-–]\s*\d{1,3})",
-        r"(\d{3,6}\s*[-–]\s*[A-Z]\s*[-–]\s*\d{1,3})",
-        r"plaque\s+['\"]?([A-Za-z0-9\u0600-\u06FF\-\s]{3,20})",
+        rf"(\d{{1,6}}\s*{PLATE_SEP}\s*[{ARABIC_LETTER_RANGE}]+\s*{PLATE_SEP}\s*\d{{1,3}})",
+        rf"(\d{{1,6}}\s*{PLATE_SEP}\s*[A-Z]\s*{PLATE_SEP}\s*\d{{1,3}})",
+        rf"plaque\s+['\"]?((?=[A-Za-z0-9{ARABIC_LETTER_RANGE}\-\s]*\d)[A-Za-z0-9{ARABIC_LETTER_RANGE}\-\s]{{3,20}})",
     ]
     for pattern in patterns:
-        match = re.search(pattern, question, flags=re.IGNORECASE)
+        match = re.search(pattern, cleaned, flags=re.IGNORECASE)
         if match:
             raw = match.group(1).strip()
             normalized = normalize_plate(raw)
@@ -84,9 +95,10 @@ def extract_plate(question: str) -> tuple[str | None, str | None]:
 def extract_time_range(question: str) -> tuple[str, str] | None:
     if not question:
         return None
-    match = re.search(r"entre\s+(\d{1,2}[:h]\d{2})\s+et\s+(\d{1,2}[:h]\d{2})", question, re.IGNORECASE)
+    normalized = _normalize_text(question)
+    match = re.search(r"entre\s+(\d{1,2}[:h]\d{2})\s+et\s+(\d{1,2}[:h]\d{2})", normalized)
     if not match:
-        match = re.search(r"de\s+(\d{1,2}[:h]\d{2})\s+a\s+(\d{1,2}[:h]\d{2})", question, re.IGNORECASE)
+        match = re.search(r"de\s+(\d{1,2}[:h]\d{2})\s+a\s+(\d{1,2}[:h]\d{2})", normalized)
     if not match:
         return None
     start = match.group(1).replace("h", ":")
@@ -97,7 +109,8 @@ def extract_time_range(question: str) -> tuple[str, str] | None:
 def extract_time_value(question: str) -> str | None:
     if not question:
         return None
-    match = re.search(r"(?:a|à)\s*(\d{1,2}[:h]\d{2})", question, re.IGNORECASE)
+    normalized = _normalize_text(question)
+    match = re.search(r"\ba\s*(\d{1,2}[:h]\d{2})", normalized)
     if not match:
         return None
     value = match.group(1).replace("h", ":")
