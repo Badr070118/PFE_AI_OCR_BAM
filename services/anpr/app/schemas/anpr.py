@@ -43,6 +43,8 @@ class AskResponse(BaseModel):
     answer: str
     sql: str
     rows: list[dict[str, Any]]
+    intent: str | None = None
+    confidence: float | None = None
 
 
 class AuthorizedEmployeeRequest(BaseModel):

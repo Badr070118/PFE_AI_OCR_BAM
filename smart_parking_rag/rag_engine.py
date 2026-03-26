@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import json
 import os
 import re
@@ -11,6 +12,7 @@ from sqlalchemy import create_engine, text
 
 from analytics import build_late_arrivals_query, format_late_arrivals
 
+loog = logging.getLogger(__name__)
 ALLOWED_TABLES = {"employees", "access_logs"}
 SCHEMA_CONTEXT = """\
 Tables:
@@ -328,6 +330,7 @@ def generate_answer(question: str, sql: str, rows: list[dict[str, Any]]) -> str:
 
 def ask_question(question: str) -> dict:
     sql = generate_sql(question)
+    logging.info(f"Generated SQL: {sql}")
     try:
         rows = run_query(sql)
     except Exception as exc:

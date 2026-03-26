@@ -206,6 +206,14 @@
   border-collapse: collapse;
 }
 
+.parking-table {
+  overflow-x: auto;
+}
+
+.parking-table table {
+  min-width: 520px;
+}
+
 .parking-table th,
 .parking-table td {
   text-align: left;
@@ -412,77 +420,126 @@
   white-space: nowrap;
 }
 
-.reports-grid {
+.presence-reports {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.presence-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.presence-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.presence-head p {
+  margin: 0.35rem 0 0 0;
+  color: rgba(15, 23, 42, 0.65);
+}
+
+.presence-meta {
+  display: grid;
+  gap: 0.35rem;
+  text-align: right;
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.55);
+}
+
+.presence-shell {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
-.reports-card {
+.presence-card {
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
-  padding: 1rem;
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
   background: #ffffff;
   display: grid;
-  gap: 0.75rem;
+  gap: 0.8rem;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.04);
 }
 
-.reports-card h3 {
+.presence-card h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
-.reports-form {
+.presence-fields {
   display: grid;
   gap: 0.75rem;
 }
 
-.reports-form label {
+.presence-fields label {
   display: grid;
   gap: 0.35rem;
   font-size: 0.9rem;
 }
 
-.reports-form input,
-.reports-form select {
+.presence-fields input,
+.presence-fields select {
   border-radius: 12px;
   border: 1px solid rgba(17, 17, 17, 0.12);
-  padding: 0.5rem 0.65rem;
+  padding: 0.55rem 0.7rem;
   font-size: 0.95rem;
   background: #ffffff;
 }
 
-.reports-inline {
+.presence-inline {
   display: grid;
   gap: 0.75rem;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
-.reports-actions {
+.presence-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.reports-preview {
-  display: grid;
-  gap: 0.8rem;
+.presence-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.9rem;
 }
 
-.reports-meta {
+.presence-report-ready {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px;
+  background: #f8fafc;
+  font-size: 0.9rem;
+}
+
+.presence-preview {
+  background: linear-gradient(140deg, #f8f8f3, #ffffff);
+}
+
+.presence-meta-block {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.25rem;
   font-size: 0.85rem;
   color: rgba(15, 23, 42, 0.7);
 }
 
-.reports-stats {
+.presence-summary {
   display: grid;
   gap: 0.6rem;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
-.reports-stats div {
+.presence-summary div {
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 12px;
   padding: 0.65rem;
@@ -491,20 +548,20 @@
   gap: 0.25rem;
 }
 
-.reports-table {
+.presence-table {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
-.reports-table-header,
-.reports-table-row {
+.presence-table-head,
+.presence-table-row {
   display: grid;
   gap: 0.5rem;
   align-items: center;
-  grid-template-columns: 1.4fr 1fr 0.7fr 0.6fr 0.8fr 0.8fr;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
-.reports-table-header {
+.presence-table-head {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -512,7 +569,7 @@
   padding: 0 0.2rem;
 }
 
-.reports-table-row {
+.presence-table-row {
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 10px;
   padding: 0.45rem 0.6rem;
@@ -520,12 +577,32 @@
   background: #ffffff;
 }
 
-.reports-history {
+.presence-anomalies {
   display: grid;
-  gap: 0.6rem;
+  gap: 0.4rem;
 }
 
-.reports-history-item {
+.presence-anomalies h4 {
+  margin: 0.4rem 0 0.2rem 0;
+  font-size: 0.95rem;
+}
+
+.presence-anomaly-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  background: #ffffff;
+  font-size: 0.9rem;
+}
+
+.presence-history {
+  background: linear-gradient(120deg, #fefcf7, #ffffff);
+}
+
+.presence-history-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -536,16 +613,136 @@
   background: #fbfbf7;
 }
 
-.reports-history-item div {
+.presence-history-item div {
   display: grid;
   gap: 0.25rem;
   font-size: 0.85rem;
   color: rgba(15, 23, 42, 0.75);
 }
 
+.presence-analysis {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.presence-analysis-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.presence-analysis-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.presence-analysis-head p {
+  margin: 0.35rem 0 0 0;
+  color: rgba(15, 23, 42, 0.65);
+}
+
+.presence-analysis-meta {
+  display: grid;
+  gap: 0.35rem;
+  text-align: right;
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.55);
+}
+
+.presence-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.presence-tab {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #f8fafc;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.presence-tab.active {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.18);
+}
+
+.presence-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.presence-overview-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.presence-overview-controls label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.presence-metrics {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.presence-metrics div {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  padding: 0.75rem;
+  background: #f8f7f2;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.presence-table-block h3 {
+  margin: 0 0 0.75rem 0;
+}
+
+@media (max-width: 960px) {
+  .presence-meta {
+    text-align: left;
+  }
+
+  .presence-analysis-meta {
+    text-align: left;
+  }
+}
+
 @media (max-width: 720px) {
-  .reports-table-header,
-  .reports-table-row {
+  .presence-table-head,
+  .presence-table-row {
     grid-template-columns: 1fr;
+  }
+
+  .presence-history-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .parking-plate {
+    font-size: 1.25rem;
+  }
+
+  .parking-chat-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .parking-chat-form button {
+    width: 100%;
   }
 }

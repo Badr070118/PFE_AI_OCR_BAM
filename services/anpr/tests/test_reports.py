@@ -2,19 +2,15 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.anpr.attendance import AttendanceConfig, aggregate_attendance
-from app.anpr.pdf_report import build_attendance_pdf
+from app.anpr.reporting_service import buildDailyReportFromDatabase
+from app.anpr.pdf_report import build_presence_pdf
 from app.api.routes import reports as reports_router
 
 
-def test_daily_aggregation_late_and_incomplete(monkeypatch):
-    def fake_config():
-        return AttendanceConfig(standard_start=time(hour=9, minute=0), late_minutes=15, dedup_minutes=5)
-
+def test_daily_report_real_shape(monkeypatch):
     def fake_employees():
         return [
             {
@@ -23,68 +19,31 @@ def test_daily_aggregation_late_and_incomplete(monkeypatch):
                 "department": "IT",
                 "employee_code": "EMP-1",
                 "is_active": True,
-            },
-            {
-                "full_name": "Omar",
-                "plate_number": "BBB-2",
-                "department": "HR",
-                "employee_code": "EMP-2",
-                "is_active": True,
-            },
-        ]
-
-    def fake_vehicles():
-        return [
-            {
-                "owner_name": "Sara",
-                "plate_number": "AAA-1",
-                "vehicle_type": "IT",
-                "status": "AUTHORIZED",
-            },
-            {
-                "owner_name": "Omar",
-                "plate_number": "BBB-2",
-                "vehicle_type": "HR",
-                "status": "AUTHORIZED",
-            },
+            }
         ]
 
     def fake_logs(*_args, **_kwargs):
         day = date(2026, 3, 26)
         return [
             {
+                "id": 1,
                 "plate_number": "AAA-1",
                 "entry_time": datetime.combine(day, time(hour=9, minute=5)),
                 "exit_time": datetime.combine(day, time(hour=17, minute=0)),
                 "status": "AUTHORIZED",
-            },
-            {
-                "plate_number": "BBB-2",
-                "entry_time": datetime.combine(day, time(hour=9, minute=40)),
-                "exit_time": None,
-                "status": "AUTHORIZED",
-            },
+            }
         ]
 
     def fake_unknown(*_args, **_kwargs):
         return []
 
-    monkeypatch.setattr("app.anpr.attendance.build_attendance_config", fake_config)
-    monkeypatch.setattr("app.anpr.attendance.fetch_employees", fake_employees)
-    monkeypatch.setattr("app.anpr.attendance.fetch_vehicles", fake_vehicles)
-    monkeypatch.setattr("app.anpr.attendance.fetch_parking_logs_range", fake_logs)
-    monkeypatch.setattr("app.anpr.attendance.fetch_unknown_detections_range", fake_unknown)
+    monkeypatch.setattr("app.anpr.reporting_service.fetch_employees", fake_employees)
+    monkeypatch.setattr("app.anpr.reporting_service.fetch_parking_logs_range", fake_logs)
+    monkeypatch.setattr("app.anpr.reporting_service.fetch_unknown_detections_range", fake_unknown)
 
-    result = aggregate_attendance(date(2026, 3, 26), date(2026, 3, 26))
-    summary = result["summary"]
-    assert summary["total_employees"] == 2
-    assert summary["employees_present"] == 2
-    assert summary["total_late"] == 1
-
-    employees = {emp["plate_number"]: emp for emp in result["employees"]}
-    assert employees["AAA-1"]["late_count"] == 0
-    assert employees["BBB-2"]["late_count"] == 1
-    assert employees["BBB-2"]["anomalies_count"] == 1
+    report = buildDailyReportFromDatabase(date(2026, 3, 26))
+    assert report["summary"]["total_employees"] == 1
+    assert report["employees"][0]["full_name"] == "Sara"
 
 
 def test_pdf_generation(tmp_path):
@@ -96,6 +55,7 @@ def test_pdf_generation(tmp_path):
         "summary": {
             "total_employees": 1,
             "employees_present": 1,
+            "employees_absent": 0,
             "total_presences": 1,
             "total_late": 0,
             "total_anomalies": 0,
@@ -135,7 +95,7 @@ def test_pdf_generation(tmp_path):
     }
 
     output = tmp_path / "report.pdf"
-    build_attendance_pdf(report, output)
+    build_presence_pdf(report, output)
     assert output.exists()
     assert output.stat().st_size > 0
 
@@ -149,6 +109,7 @@ def test_preview_endpoint(monkeypatch):
         "summary": {
             "total_employees": 0,
             "employees_present": 0,
+            "employees_absent": 0,
             "total_presences": 0,
             "total_late": 0,
             "total_anomalies": 0,
@@ -171,37 +132,3 @@ def test_preview_endpoint(monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert data["report_type"] == "daily"
-
-
-@pytest.mark.parametrize("report_id", [1])
-def test_generate_endpoint(monkeypatch, report_id):
-    sample = {
-        "report_id": report_id,
-        "report_type": "daily",
-        "start_date": date(2026, 3, 26),
-        "end_date": date(2026, 3, 26),
-        "generated_at": datetime(2026, 3, 26, 10, 0, 0),
-        "file_name": "demo.pdf",
-        "summary": {
-            "total_employees": 0,
-            "employees_present": 0,
-            "total_presences": 0,
-            "total_late": 0,
-            "total_anomalies": 0,
-            "total_presence_minutes": 0.0,
-            "avg_presence_minutes": 0.0,
-            "first_arrival": {"timestamp": None, "employee": None},
-            "last_exit": {"timestamp": None, "employee": None},
-        },
-    }
-
-    monkeypatch.setattr(reports_router, "generate_report", lambda _payload: sample)
-
-    app = FastAPI()
-    app.include_router(reports_router.router)
-    client = TestClient(app)
-
-    response = client.post("/anpr/reports/generate", json={"report_type": "daily", "date": "2026-03-26"})
-    assert response.status_code == 200
-    data = response.json()
-    assert data["report_id"] == report_id

@@ -22,6 +22,7 @@ class ReportEdge(BaseModel):
 class ReportSummary(BaseModel):
     total_employees: int
     employees_present: int
+    employees_absent: int
     total_presences: int
     total_late: int
     total_anomalies: int
