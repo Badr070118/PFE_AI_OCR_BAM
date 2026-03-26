@@ -77,6 +77,12 @@ parking_logs = Table(
         nullable=False,
         server_default=text("0" if IS_SQLITE else "false"),
     ),
+    Column(
+        "manual_exit_opened",
+        Boolean,
+        nullable=False,
+        server_default=text("0" if IS_SQLITE else "false"),
+    ),
 )
 
 attendance_reports = Table(
@@ -196,6 +202,8 @@ def log_detection(
         )
 
         if open_log:
+            if open_log.get("status") in {"UNKNOWN", "BLACKLISTED"}:
+                return {"log_id": int(open_log["id"]), "event": "exit_pending"}
             connection.execute(
                 update(parking_logs)
                 .where(parking_logs.c.id == open_log["id"])
@@ -211,6 +219,7 @@ def log_detection(
                 status=status,
                 image_path=image_path,
                 manual_opened=manual_opened,
+                manual_exit_opened=False,
             )
         )
         inserted = result.inserted_primary_key
@@ -228,6 +237,7 @@ def log_no_plate(image_path: str | None, detected_at: datetime) -> dict:
                 status="NO_PLATE",
                 image_path=image_path,
                 manual_opened=False,
+                manual_exit_opened=False,
             )
         )
         inserted = result.inserted_primary_key
@@ -266,12 +276,19 @@ def mark_manual_open(plate_number: str, opened_at: datetime) -> dict:
                 break
         if not open_log:
             return {"updated": False, "log_id": None}
+        if not open_log.get("manual_opened"):
+            connection.execute(
+                update(parking_logs)
+                .where(parking_logs.c.id == open_log["id"])
+                .values(entry_time=opened_at, manual_opened=True)
+            )
+            return {"updated": True, "log_id": int(open_log["id"]), "stage": "entry"}
         connection.execute(
             update(parking_logs)
             .where(parking_logs.c.id == open_log["id"])
-            .values(entry_time=opened_at, manual_opened=True)
+            .values(exit_time=opened_at, manual_exit_opened=True)
         )
-    return {"updated": True, "log_id": int(open_log["id"])}
+    return {"updated": True, "log_id": int(open_log["id"]), "stage": "exit"}
 
 
 def close_parking_session(plate_number: str, exit_time: datetime) -> dict:

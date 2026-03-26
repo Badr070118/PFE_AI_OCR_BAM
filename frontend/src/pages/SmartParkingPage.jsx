@@ -354,6 +354,7 @@ export default function SmartParkingPage() {
   useEffect(() => {
     if (!manualAllowed) {
       setManualOverride(false);
+      setManualOpenError("");
     }
   }, [manualAllowed, result?.timestamp]);
 

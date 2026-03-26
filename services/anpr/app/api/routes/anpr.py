@@ -277,7 +277,7 @@ def manual_open(payload: ManualOpenRequest) -> dict:
     result = mark_manual_open(plate, datetime.now())
     if not result["updated"]:
         raise HTTPException(status_code=400, detail="No unknown/blacklisted open log found for this plate.")
-    return {"plate_number": plate, "log_id": result["log_id"], "opened": True}
+    return {"plate_number": plate, "log_id": result["log_id"], "opened": True, "stage": result.get("stage")}
 
 
 @router.get("/anpr/logs")
